@@ -16,10 +16,9 @@ class QuickBlock : Hook(
 ) {
     private val blockViewModel = "ff.b" // search for '("STATUS_BLOCK_DIALOG_SHOWN", 1)'
     private val profileViewHolder = "com.grindrapp.android.ui.profileV2.e" // search for 'com.grindrapp.android.ui.profileV2.ProfileViewHolder$onBind$3'
-    private val profileModel = "com.grindrapp.android.persistence.model.Profile"
 
     override fun init() {
-        findClass(profileViewHolder).hook("x", HookStage.AFTER) { param ->
+        findClass(profileViewHolder).hook("y", HookStage.AFTER) { param ->
             val arg0 = param.arg(0) as Any
             val profileId = param.args().getOrNull(1) ?: return@hook
             val viewBinding = getObjectField(arg0, "b")
@@ -43,12 +42,6 @@ class QuickBlock : Hook(
                 .firstOrNull { it.isNotEmpty() && it.all { char -> char.isDigit() } }
             GrindrPlus.httpClient.blockUser(profileId as String)
             param.setResult(null)
-        }
-
-        setOf("isBlockable", "component60").forEach {
-            findClass(profileModel).hook(it, HookStage.BEFORE) { param ->
-                param.setResult(true)
-            }
         }
     }
 }

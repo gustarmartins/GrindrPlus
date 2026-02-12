@@ -98,7 +98,7 @@ import timber.log.Timber.DebugTree
 internal val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 internal const val TAG = "GrindrPlus"
 internal const val DATA_URL =
-    "https://raw.githubusercontent.com/R0rt1z2/GrindrPlus/refs/heads/master/manifest.json"
+    "https://raw.githubusercontent.com/gustarmartins/GrindrPlus/refs/heads/master/manifest.json"
 
 sealed class MainNavItem(
     val icon: ImageVector? = null,

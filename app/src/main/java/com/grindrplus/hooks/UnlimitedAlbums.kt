@@ -25,7 +25,6 @@ import com.grindrplus.utils.RetrofitUtils.getSuccessValue
 import com.grindrplus.utils.RetrofitUtils.isFail
 import com.grindrplus.utils.RetrofitUtils.isGET
 import com.grindrplus.utils.RetrofitUtils.isPUT
-import com.grindrplus.utils.RetrofitUtils.isResult
 import com.grindrplus.utils.RetrofitUtils.isSuccess
 import com.grindrplus.utils.hook
 import com.grindrplus.utils.hookConstructor
@@ -58,9 +57,6 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
             albumsServiceClass,
         ) { originalHandler, proxy, method, args ->
             val result = originalHandler.invoke(proxy, method, args)
-
-            if (!result.isResult())
-                return@hookService result
 
             try {
                 when {
@@ -226,6 +222,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
 
     private fun handleGetAlbum(args: Array<Any?>, result: Any) =
         withSuspendResult(args, result) { args, result ->
+            if (!result.isSuccess()) return@withSuspendResult result
             val albumId = args[0] as? Long ?: return@withSuspendResult result
             logd("Fetching album with ID: $albumId")
 
@@ -254,6 +251,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
         }
 
     private fun fetchAlbumFromDatabase(albumId: Long, originalResult: Any): Any {
+        if (!originalResult.isSuccess()) return originalResult
         try {
             loge("Fetching album with ID: $albumId from database")
             return runBlocking {
@@ -299,6 +297,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
     }
 
     private fun parseAlbumContent(albumId: Long, responseBody: String, originalResult: Any): Any {
+        if (!originalResult.isSuccess()) return originalResult
         try {
             logd("Parsing album content for ID: $albumId")
             val jsonResponse = JSONObject(responseBody)

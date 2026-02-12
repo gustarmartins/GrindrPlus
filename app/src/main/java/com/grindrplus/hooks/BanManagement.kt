@@ -22,7 +22,6 @@ import com.grindrplus.utils.HookStage
 import com.grindrplus.utils.RetrofitUtils
 import com.grindrplus.utils.RetrofitUtils.getFailValue
 import com.grindrplus.utils.RetrofitUtils.isFail
-import com.grindrplus.utils.RetrofitUtils.isResult
 import com.grindrplus.utils.hook
 import com.grindrplus.utils.hookConstructor
 import com.grindrplus.utils.withSuspendResult
@@ -50,9 +49,6 @@ class BanManagement : Hook(
             authService,
         ) { originalHandler, proxy, method, args ->
             val result = originalHandler.invoke(proxy, method, args)
-
-            if (!result.isResult())
-                return@hookService result
 
             val isLogin = args.size > 1 && args[1] != null &&
                     args[1]!!::class.java.name.contains("LoginEmailRequest")

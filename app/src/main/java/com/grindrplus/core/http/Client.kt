@@ -260,7 +260,8 @@ class Client(interceptor: Interceptor) {
         pageNumber: Int = 1,
         favorites: Boolean = false,
         showSponsoredProfiles: Boolean = false,
-        shuffle: Boolean = false
+        shuffle: Boolean = false,
+        hot: Boolean = false
     ): JSONObject = withContext(Dispatchers.IO) {
         try {
             val url = buildString {
@@ -274,6 +275,7 @@ class Client(interceptor: Interceptor) {
                 append("&favorites=$favorites")
                 append("&showSponsoredProfiles=$showSponsoredProfiles")
                 append("&shuffle=$shuffle")
+                append("&hot=$hot")
             }
 
             val response = sendRequest(url, "GET")

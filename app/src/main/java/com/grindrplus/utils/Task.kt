@@ -22,9 +22,10 @@ abstract class Task(
     }
 
     /**
-     * Override this method to implement task-specific logic
+     * Override this method to implement task-specific logic.
+     * Return true if the task executed successfully, false otherwise.
      */
-    abstract suspend fun execute()
+    abstract suspend fun execute(): Boolean
 
     /**
      * Start the task if it's enabled in config
@@ -41,8 +42,12 @@ abstract class Task(
             intervalMillis = intervalMillis,
             action = {
                 try {
-                    execute()
-                    Logger.i("Task $id executed successfully", LogSource.MODULE)
+                    val success = execute()
+                    if (success) {
+                        Logger.i("Task $id executed successfully", LogSource.MODULE)
+                    } else {
+                        Logger.w("Task $id did not complete successfully", LogSource.MODULE)
+                    }
                 } catch (e: Exception) {
                     Logger.e("Task $id failed: ${e.message}", LogSource.MODULE)
                     Logger.writeRaw(e.stackTraceToString())

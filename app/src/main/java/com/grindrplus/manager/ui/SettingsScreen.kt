@@ -916,8 +916,10 @@ fun ImprovedTextSettingWithButtons(
                             setting.buttons.forEach { buttonAction ->
                                 Button(
                                     onClick = {
-                                        buttonAction.action()
-                                        text = setting.value
+                                        val result = buttonAction.action()
+                                        if (result != null) {
+                                            text = result
+                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,

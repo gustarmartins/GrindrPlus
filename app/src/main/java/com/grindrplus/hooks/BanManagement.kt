@@ -223,7 +223,7 @@ class BanManagement : Hook(
         if (isDeviceBan) {
             dialog.setNeutralButton("Generate New Device ID") { _, _ ->
                 val uuid = java.util.UUID.randomUUID()
-                val newDeviceId = uuid.toString().replace("-", "")
+                val newDeviceId = uuid.toString().replace("-", "").substring(0, 16)
                 Config.put("android_device_id", newDeviceId)
                 restartGrindr(1500, "New device ID generated. Grindr will restart now.")
             }

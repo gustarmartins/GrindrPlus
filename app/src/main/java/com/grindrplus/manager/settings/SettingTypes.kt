@@ -22,7 +22,7 @@ data class TextSetting(
 
 data class ButtonAction(
     val name: String,
-    val action: () -> Unit
+    val action: () -> String?
 )
 
 data class TextSettingWithButtons(

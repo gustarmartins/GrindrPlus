@@ -224,6 +224,7 @@ class SettingsViewModel(
                                 Config.put("android_device_id", newDeviceId)
                                 loadSettings()
                                 Toast.makeText(context, "New device ID generated", Toast.LENGTH_SHORT).show()
+                                newDeviceId
                             }
                         )
 
@@ -352,6 +353,7 @@ class SettingsViewModel(
                                         ::showApiKeyTestDialog
                                     )
                                 }
+                                null
                             }
                         )
                     ),

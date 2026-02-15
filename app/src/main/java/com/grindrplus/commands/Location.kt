@@ -57,8 +57,8 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
         if (args.isEmpty()) {
             val status = (Config.get("current_location", "") as String).isEmpty()
             if (!status) {
-                Config.put("current_location", "")
-                return GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
+                disableTeleport()
+                return
             }
 
             return GrindrPlus.showToast(Toast.LENGTH_LONG, "Please provide a location")
@@ -74,8 +74,8 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
          */
         when {
             args.size == 1 && args[0] == "off" -> {
-                Config.put("current_location", "")
-                return GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
+                disableTeleport()
+                return
             }
             args.size == 1 && args[0].contains(",") -> {
                 val (lat, lon) = args[0].split(",").map { it.toDouble() }
@@ -91,17 +91,18 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
                  * it could be either a saved location or an actual city.
                  */
                 coroutineScope.launch {
-                    val location = getLocation(args.joinToString(" "))
+                    val query = args.joinToString(" ")
+                    val location = getLocation(query)
                     if (location != null) {
-                        teleportToCoordinates(location.first, location.second)
+                        teleportToCoordinates(location.first, location.second, name = query)
                     } else {
                         /**
                          * No valid saved location was found, try to get the actual location
                          * using Android's native Geocoder.
                          */
-                        val apiLocation = getLocationFromGeocoder(args.joinToString(" "))
+                        val apiLocation = getLocationFromGeocoder(query)
                         if (apiLocation != null) {
-                            teleportToCoordinates(apiLocation.first, apiLocation.second)
+                            teleportToCoordinates(apiLocation.first, apiLocation.second, name = query)
                         } else {
                             GrindrPlus.showToast(Toast.LENGTH_LONG, "Location not found")
                         }
@@ -281,19 +282,79 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
         }
     }
 
-    private fun teleportToCoordinates(lat: Double, lon: Double, silent: Boolean = false) {
-        Config.put("current_location", "$lat,$lon")
+    private fun disableTeleport() {
+        Config.put("current_location", "")
+        Config.put("current_location_name", "")
+
+        val gpsCoords = getGpsLocation()
+        if (gpsCoords == null) {
+            GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled, but could not get GPS to update server.")
+            return
+        }
+
+        val parts = gpsCoords.split(",")
+        val lat = parts[0].toDouble()
+        val lon = parts[1].toDouble()
         val geohash = coordsToGeoHash(lat, lon)
 
         GrindrPlus.executeAsync {
             try {
-                GrindrPlus.httpClient.updateLocation(geohash)
+                val success = GrindrPlus.httpClient.updateLocation(geohash)
+                if (success) {
+                    try {
+                        val refreshed = GrindrPlus.httpClient.refreshSessionViaIncognito()
+                        if (!refreshed) {
+                            Logger.w("Session refresh failed after disabling teleport. " +
+                                    "You will still be shown at the old spoofed location for a while.")
+                        }
+                    } catch (e: Exception) {
+                        Logger.w("Session refresh failed after disabling teleport. ${e.message}")
+                    }
+                    GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled.")
+                } else {
+                    GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled - visibility at real location may be delayed.")
+                }
             } catch (e: Exception) {
-                Logger.e("Error sending geohash to API: ${e.message}")
+                Logger.e("Error updating location after disabling teleport: ${e.message}")
+                GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled locally, but server update failed.")
             }
         }
+    }
 
-        if (!silent)
-            GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $lat, $lon")
+    private fun teleportToCoordinates(lat: Double, lon: Double, name: String = "", silent: Boolean = false) {
+        Config.put("current_location", "$lat,$lon")
+        Config.put("current_location_name", name)
+        val geohash = coordsToGeoHash(lat, lon)
+
+        GrindrPlus.executeAsync {
+            try {
+                val success = GrindrPlus.httpClient.updateLocation(geohash)
+                if (success) {
+                    // Toggles incognito on/off
+                    // This triggers POST /v8/sessions which registers presence to update the global cascade grid
+                    try {
+                        val refreshed = GrindrPlus.httpClient.refreshSessionViaIncognito()
+                        if (!refreshed) {
+                            Logger.w("Session refresh failed after teleport - visibility at the spoofed location may be delayed.")
+                        }
+                    } catch (e: Exception) {
+                        Logger.w("Session refresh failed after teleport: ${e.message}")
+                    }
+
+                    if (!silent) {
+                        GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $lat, $lon")
+                    }
+                } else {
+                    if (!silent) {
+                        GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported locally, but server update failed.")
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e("Error sending geohash to API: ${e.message}")
+                if (!silent) {
+                    GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported locally, but server update failed")
+                }
+            }
+        }
     }
 }

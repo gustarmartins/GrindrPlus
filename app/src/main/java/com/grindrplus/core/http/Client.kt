@@ -193,27 +193,72 @@ class Client(interceptor: Interceptor) {
         }
     }
 
-    fun updateLocation(geohash: String) {
+    fun updateLocation(geohash: String): Boolean {
         val body = """
             {
                 "geohash": "$geohash"
             }
         """.trimIndent()
 
-        GrindrPlus.executeAsync {
-            val response = sendRequest(
-                "https://grindr.mobi/v4/location",
+        val response = sendRequest(
+            "https://grindr.mobi/v4/location",
+            "PUT",
+            body = body.toRequestBody(),
+            headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
+        )
+        if (response.isSuccessful) {
+            return true
+        } else {
+            response.useBody { errorBody ->
+                Logger.e("Failed to update location: $errorBody")
+            }
+            return false
+        }
+    }
+
+    /**
+     * Work-around to force Grindr's internal session refresh.
+     * Incognito toggle triggers POST /v8/sessions with the current geohash, 
+     * which registers the user in the global cascade grid at the new location.
+     */
+    fun refreshSessionViaIncognito(): Boolean {
+        try {
+            val incognitoOn = """{"settings":{"incognito":true}}""".toRequestBody()
+            val incognitoOff = """{"settings":{"incognito":false}}""".toRequestBody()
+
+            val onResponse = sendRequest(
+                "https://grindr.mobi/v3/me/prefs/settings",
                 "PUT",
-                body = body.toRequestBody(),
+                body = incognitoOn,
                 headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
             )
-            if (response.isSuccessful) {
-                showToast(Toast.LENGTH_LONG, "Location updated successfully")
-            } else {
-                response.useBody { errorBody ->
-                    showToast(Toast.LENGTH_LONG, "Failed to update location: $errorBody")
+            if (!onResponse.isSuccessful) {
+                onResponse.useBody { errorBody ->
+                    Logger.w("Incognito ON failed (${onResponse.code}): $errorBody")
                 }
+                return false
             }
+
+            // wait Grindr's internals process for the state change
+            Thread.sleep(500)
+
+            val offResponse = sendRequest(
+                "https://grindr.mobi/v3/me/prefs/settings",
+                "PUT",
+                body = incognitoOff,
+                headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
+            )
+            if (!offResponse.isSuccessful) {
+                offResponse.useBody { errorBody ->
+                    Logger.w("Incognito OFF failed (${offResponse.code}): $errorBody")
+                }
+                return false
+            }
+
+            return true
+        } catch (e: Exception) {
+            Logger.w("Session refresh via incognito failed: ${e.message}")
+            return false
         }
     }
 

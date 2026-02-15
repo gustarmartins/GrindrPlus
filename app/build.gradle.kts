@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.grindrplus"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         val grindrVersionName = listOf("25.20.0")

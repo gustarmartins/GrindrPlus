@@ -85,7 +85,13 @@ class BridgeService : Service() {
 
             try {
                 periodicTasksExecutor.scheduleWithFixedDelay(
-                    { runBlocking { fetchNotifs(this@BridgeService) } },
+                    {
+                        try {
+                            runBlocking { fetchNotifs(this@BridgeService) }
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).e(e, "Failed to fetch notifications")
+                        }
+                    },
                     0,
                     15,
                     java.util.concurrent.TimeUnit.SECONDS

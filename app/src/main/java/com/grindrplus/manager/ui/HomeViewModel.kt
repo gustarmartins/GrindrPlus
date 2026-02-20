@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.grindrplus.core.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -101,12 +102,14 @@ class HomeViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // Both requests are made in parallel
-                val contributorsDeferred = async { fetchUrlContent(CONTRIBUTORS_URL) }
-                val releasesDeferred = async { fetchUrlContent(RELEASES_URL) }
+                coroutineScope {
+                    // Both requests are made in parallel
+                    val contributorsDeferred = async { fetchUrlContent(CONTRIBUTORS_URL) }
+                    val releasesDeferred = async { fetchUrlContent(RELEASES_URL) }
 
-                parseContributors(contributorsDeferred.await())
-                parseReleases(releasesDeferred.await())
+                    parseContributors(contributorsDeferred.await())
+                    parseReleases(releasesDeferred.await())
+                }
             } catch (e: Exception) {
                 Logger.e("$TAG: Error fetching data: ${e.message}")
                 errorMessage.value = "An error occurred: ${e.message}"

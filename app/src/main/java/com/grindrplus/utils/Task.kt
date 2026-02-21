@@ -3,7 +3,10 @@ package com.grindrplus.utils
 import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
 import com.grindrplus.core.Logger
-import com.grindrplus.core.LogSource
+import com.grindrplus.core.logd
+import com.grindrplus.core.loge
+import com.grindrplus.core.logi
+import com.grindrplus.core.logw
 import kotlinx.coroutines.Job
 
 abstract class Task(
@@ -22,16 +25,17 @@ abstract class Task(
     }
 
     /**
-     * Override this method to implement task-specific logic
+     * Override this method to implement task-specific logic.
+     * Return true if the task executed successfully, false otherwise.
      */
-    abstract suspend fun execute()
+    abstract suspend fun execute(): Boolean
 
     /**
      * Start the task if it's enabled in config
      */
     fun start() {
         if (!isTaskEnabled()) {
-            Logger.i("Task $id is disabled", LogSource.MODULE)
+            logi("Task $id is disabled")
             return
         }
 
@@ -41,16 +45,20 @@ abstract class Task(
             intervalMillis = intervalMillis,
             action = {
                 try {
-                    execute()
-                    Logger.i("Task $id executed successfully", LogSource.MODULE)
+                    val success = execute()
+                    if (success) {
+                        logd("Task $id executed successfully")
+                    } else {
+                        logw("Task $id run was unsuccessful")
+                    }
                 } catch (e: Exception) {
-                    Logger.e("Task $id failed: ${e.message}", LogSource.MODULE)
+                    loge("Task $id failed: ${e.message}")
                     Logger.writeRaw(e.stackTraceToString())
                 }
             }
         )
 
-        Logger.i("Task $id started", LogSource.MODULE)
+        logi("Task $id started")
     }
 
     /**
@@ -60,7 +68,7 @@ abstract class Task(
         job?.let {
             if (GrindrPlus.taskManager.isTaskRunning(id)) {
                 GrindrPlus.taskManager.cancelTask(id)
-                Logger.i("Task $id stopped", LogSource.MODULE)
+                logi("Task $id stopped")
             }
         }
         job = null

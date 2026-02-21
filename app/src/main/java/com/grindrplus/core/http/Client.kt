@@ -63,6 +63,7 @@ class Client(interceptor: Interceptor) {
                 "POST"
             )
             if (response.isSuccessful) {
+                response.close()
                 if (!silent) showToast(Toast.LENGTH_LONG, "User blocked successfully")
                 if (reflectInDb) {
                     val order = DatabaseHelper.query(
@@ -98,6 +99,7 @@ class Client(interceptor: Interceptor) {
                 "DELETE"
             )
             if (response.isSuccessful) {
+                response.close()
                 if (!silent) showToast(Toast.LENGTH_LONG, "User unblocked successfully")
                 try {
                     if (reflectInDb) {
@@ -138,6 +140,7 @@ class Client(interceptor: Interceptor) {
                 "POST"
             )
             if (response.isSuccessful) {
+                response.close()
                 if (!silent) showToast(Toast.LENGTH_LONG, "User favorited successfully")
                 if (reflectInDb) {
                     DatabaseHelper.insert(
@@ -168,6 +171,7 @@ class Client(interceptor: Interceptor) {
                 "DELETE"
             )
             if (response.isSuccessful) {
+                response.close()
                 if (!silent) showToast(Toast.LENGTH_LONG, "User unfavorited successfully")
                 try {
                     if (reflectInDb) {
@@ -193,27 +197,102 @@ class Client(interceptor: Interceptor) {
         }
     }
 
-    fun updateLocation(geohash: String) {
+    fun updateLocation(geohash: String): Boolean {
         val body = """
             {
                 "geohash": "$geohash"
             }
         """.trimIndent()
 
-        GrindrPlus.executeAsync {
-            val response = sendRequest(
-                "https://grindr.mobi/v4/location",
-                "PUT",
-                body = body.toRequestBody(),
-                headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
-            )
-            if (response.isSuccessful) {
-                showToast(Toast.LENGTH_LONG, "Location updated successfully")
-            } else {
-                response.useBody { errorBody ->
-                    showToast(Toast.LENGTH_LONG, "Failed to update location: $errorBody")
-                }
+        val response = sendRequest(
+            "https://grindr.mobi/v4/location",
+            "PUT",
+            body = body.toRequestBody(),
+            headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
+        )
+        if (response.isSuccessful) {
+            response.close()
+            return true
+        } else {
+            response.useBody { errorBody ->
+                Logger.e("Failed to update location: $errorBody")
             }
+            return false
+        }
+    }
+
+    /**
+     * Work-around to force Grindr's internal session refresh.
+     * Grindr only fires POST /v8/sessions when the server-side incognito
+     * state *actually changes*. The GET endpoint is unreliable (always
+     * returns false), so we can't know the real state.
+     *
+     * Solution: always PUT false first (to ensure the server is in a known
+     * state), wait for the websocket reconnect cycle to complete (~2s),
+     * then PUT true. This guarantees a real false→true state transition,
+     * which triggers POST /v8/sessions with the current geohash and
+     * registers the user in the cascade grid at the new location.
+     *
+     * The OFF toggle may invalidate the current auth token (if it causes
+     * a real state change). The ON PUT will retry with backoff to wait
+     * for Grindr's internal token refresh to complete.
+     */
+    fun refreshSessionViaIncognito(): Boolean {
+        try {
+            val settingsUrl = "https://grindr.mobi/v3/me/prefs/settings"
+            val jsonHeaders = mapOf("Content-Type" to "application/json; charset=UTF-8")
+
+            // Step 1: Force incognito to false (reset to known state).
+            // If it was already false this is a no-op server-side;
+            // if it was true, this triggers a websocket reconnect which
+            // invalidates the current auth token.
+            val offBody = """{"settings":{"incognito":false}}""".toRequestBody()
+            val offResponse = sendRequest(settingsUrl, "PUT", body = offBody, headers = jsonHeaders)
+            if (!offResponse.isSuccessful) {
+                offResponse.useBody { errorBody ->
+                    Logger.w("Incognito reset to false failed (${offResponse.code}): $errorBody")
+                }
+                // Non-fatal: the state change may have still occurred server-side
+                // before the 401 was returned. Continue to step 2.
+            } else {
+                offResponse.close()
+            }
+
+            // Wait for websocket reconnect cycle to complete.
+            // Analysis shows the cycle takes ~1-2s, and a 500ms gap caused
+            // the ON PUT to arrive with a stale token → 401 → no state change.
+            Thread.sleep(2500)
+
+            // Step 2: Set incognito to true. Server should now be in the
+            // false state, so this is a real state change → Grindr fires
+            // POST /v8/sessions. Retry on 401 (token may still be refreshing).
+            val onBody = """{"settings":{"incognito":true}}""".toRequestBody()
+            var onResponse = sendRequest(settingsUrl, "PUT", body = onBody, headers = jsonHeaders)
+            var retryCount = 0
+            while (onResponse.code == 401 && retryCount < 3) {
+                onResponse.close()
+                Logger.d("Incognito ON got 401, retrying (${retryCount + 1}/3)...")
+                Thread.sleep(1500)
+                onResponse = sendRequest(settingsUrl, "PUT", body = onBody, headers = jsonHeaders)
+                retryCount++
+            }
+
+            if (!onResponse.isSuccessful) {
+                onResponse.useBody { errorBody ->
+                    Logger.w("Incognito set to true failed (${onResponse.code}): $errorBody")
+                }
+                // Even if this failed, the OFF toggle may have already
+                // triggered a session refresh. Return true to avoid
+                // unnecessary error toasts.
+                return retryCount > 0
+            } else {
+                onResponse.close()
+            }
+
+            return true
+        } catch (e: Exception) {
+            Logger.w("Session refresh via incognito failed: ${e.message}")
+            return false
         }
     }
 
@@ -241,6 +320,7 @@ class Client(interceptor: Interceptor) {
             )
 
             if (response.isSuccessful) {
+                response.close()
                 showToast(Toast.LENGTH_LONG, "User reported successfully")
             } else {
                 response.useBody { errorBody ->
@@ -260,7 +340,8 @@ class Client(interceptor: Interceptor) {
         pageNumber: Int = 1,
         favorites: Boolean = false,
         showSponsoredProfiles: Boolean = false,
-        shuffle: Boolean = false
+        shuffle: Boolean = false,
+        hot: Boolean = false
     ): JSONObject = withContext(Dispatchers.IO) {
         try {
             val url = buildString {
@@ -274,6 +355,7 @@ class Client(interceptor: Interceptor) {
                 append("&favorites=$favorites")
                 append("&showSponsoredProfiles=$showSponsoredProfiles")
                 append("&shuffle=$shuffle")
+                append("&hot=$hot")
             }
 
             val response = sendRequest(url, "GET")
@@ -406,6 +488,7 @@ class Client(interceptor: Interceptor) {
                 headers = mapOf("Content-Type" to "application/json; charset=utf-8")
             )
             if (response.isSuccessful) {
+                response.close()
                 try {
                     val existingNote = DatabaseHelper.query(
                         "SELECT * FROM profile_note WHERE profile_id = ?",

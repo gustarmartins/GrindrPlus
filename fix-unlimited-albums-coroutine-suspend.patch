@@ -1,0 +1,103 @@
+diff --git a/app/src/main/java/com/grindrplus/hooks/BanManagement.kt b/app/src/main/java/com/grindrplus/hooks/BanManagement.kt
+index d9eb2b6..ee4f299 100644
+--- a/app/src/main/java/com/grindrplus/hooks/BanManagement.kt
++++ b/app/src/main/java/com/grindrplus/hooks/BanManagement.kt
+@@ -22,7 +22,6 @@ import com.grindrplus.utils.HookStage
+ import com.grindrplus.utils.RetrofitUtils
+ import com.grindrplus.utils.RetrofitUtils.getFailValue
+ import com.grindrplus.utils.RetrofitUtils.isFail
+-import com.grindrplus.utils.RetrofitUtils.isResult
+ import com.grindrplus.utils.hook
+ import com.grindrplus.utils.hookConstructor
+ import com.grindrplus.utils.withSuspendResult
+@@ -51,9 +50,6 @@ class BanManagement : Hook(
+         ) { originalHandler, proxy, method, args ->
+             val result = originalHandler.invoke(proxy, method, args)
+ 
+-            if (!result.isResult())
+-                return@hookService result
+-
+             val isLogin = args.size > 1 && args[1] != null &&
+                     args[1]!!::class.java.name.contains("LoginEmailRequest")
+             when {
+diff --git a/app/src/main/java/com/grindrplus/hooks/UnlimitedAlbums.kt b/app/src/main/java/com/grindrplus/hooks/UnlimitedAlbums.kt
+index e92309e..e61450a 100644
+--- a/app/src/main/java/com/grindrplus/hooks/UnlimitedAlbums.kt
++++ b/app/src/main/java/com/grindrplus/hooks/UnlimitedAlbums.kt
+@@ -25,7 +25,6 @@ import com.grindrplus.utils.RetrofitUtils.getSuccessValue
+ import com.grindrplus.utils.RetrofitUtils.isFail
+ import com.grindrplus.utils.RetrofitUtils.isGET
+ import com.grindrplus.utils.RetrofitUtils.isPUT
+-import com.grindrplus.utils.RetrofitUtils.isResult
+ import com.grindrplus.utils.RetrofitUtils.isSuccess
+ import com.grindrplus.utils.hook
+ import com.grindrplus.utils.hookConstructor
+@@ -59,9 +58,6 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
+         ) { originalHandler, proxy, method, args ->
+             val result = originalHandler.invoke(proxy, method, args)
+ 
+-            if (!result.isResult())
+-                return@hookService result
+-
+             try {
+                 when {
+                     method.isGET("v2/albums/{albumId}") -> handleGetAlbum(args, result)
+@@ -226,6 +222,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
+ 
+     private fun handleGetAlbum(args: Array<Any?>, result: Any) =
+         withSuspendResult(args, result) { args, result ->
++            if (!result.isSuccess()) return@withSuspendResult result
+             val albumId = args[0] as? Long ?: return@withSuspendResult result
+             logd("Fetching album with ID: $albumId")
+ 
+@@ -254,6 +251,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
+         }
+ 
+     private fun fetchAlbumFromDatabase(albumId: Long, originalResult: Any): Any {
++        if (!originalResult.isSuccess()) return originalResult
+         try {
+             loge("Fetching album with ID: $albumId from database")
+             return runBlocking {
+@@ -299,6 +297,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
+     }
+ 
+     private fun parseAlbumContent(albumId: Long, responseBody: String, originalResult: Any): Any {
++        if (!originalResult.isSuccess()) return originalResult
+         try {
+             logd("Parsing album content for ID: $albumId")
+             val jsonResponse = JSONObject(responseBody)
+diff --git a/app/src/main/java/com/grindrplus/utils/RetrofitUtils.kt b/app/src/main/java/com/grindrplus/utils/RetrofitUtils.kt
+index c9f4c6d..e7cc86c 100644
+--- a/app/src/main/java/com/grindrplus/utils/RetrofitUtils.kt
++++ b/app/src/main/java/com/grindrplus/utils/RetrofitUtils.kt
+@@ -98,9 +98,9 @@ object RetrofitUtils {
+ 
+     /**
+      * The retrofit methods are suspend funs (use continuations) and therefore will sometimes
+-     * return COROUTINE_SUSPENDED constant instead of the actual result. Be sure to check
+-     * if the returned value actually is a result and if not, just return it early.
+-     * Hint: if (!result.isResult()) return result
++     * return COROUTINE_SUSPENDED constant instead of the actual result. The coroutine case
++     * is handled by [withSuspendResult] which wraps/unwraps values at the boundary.
++     * Do NOT add isResult() early-return guards — they prevent withSuspendResult from working.
+      */
+     fun hookService(
+         serviceClass: Class<*>,
+diff --git a/app/src/main/java/com/grindrplus/utils/SuspendResultUtils.kt b/app/src/main/java/com/grindrplus/utils/SuspendResultUtils.kt
+index f878631..83fca6e 100644
+--- a/app/src/main/java/com/grindrplus/utils/SuspendResultUtils.kt
++++ b/app/src/main/java/com/grindrplus/utils/SuspendResultUtils.kt
+@@ -4,8 +4,12 @@ import de.robv.android.xposed.XC_MethodHook
+ 
+ fun withSuspendResult(args: Array<Any?>, result: Any, onResult: (Array<Any?>, Any) -> Any): Any {
+     return if (result.toString() == "COROUTINE_SUSPENDED") {
++        val continuation = args.last()!!
+         var unhook: Set<XC_MethodHook.Unhook>? = null
+-        unhook = args.last()!!.javaClass.hook("invokeSuspend", HookStage.BEFORE) {
++        unhook = continuation.javaClass.hook("invokeSuspend", HookStage.BEFORE) {
++            // Only intercept the specific continuation instance we're targeting,
++            // not other instances of the same class from concurrent calls.
++            if (it.thisObject() !== continuation) return@hook
+             unhook?.forEach(XC_MethodHook.Unhook::unhook)
+             unhook = null
+             it.setArg(0, onResult(args, it.arg(0)))

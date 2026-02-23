@@ -7,6 +7,7 @@ import com.grindrplus.GrindrPlus
 import com.grindrplus.GrindrPlus.showToast
 import com.grindrplus.core.DatabaseHelper
 import com.grindrplus.core.Logger
+import com.grindrplus.core.LogSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.*
@@ -222,76 +223,33 @@ class Client(interceptor: Interceptor) {
     }
 
     /**
-     * Work-around to force Grindr's internal session refresh.
-     * Grindr only fires POST /v8/sessions when the server-side incognito
-     * state *actually changes*. The GET endpoint is unreliable (always
-     * returns false), so we can't know the real state.
-     *
-     * Solution: always PUT false first (to ensure the server is in a known
-     * state), wait for the websocket reconnect cycle to complete (~2s),
-     * then PUT true. This guarantees a real false→true state transition,
-     * which triggers POST /v8/sessions with the current geohash and
-     * registers the user in the cascade grid at the new location.
-     *
-     * The OFF toggle may invalidate the current auth token (if it causes
-     * a real state change). The ON PUT will retry with backoff to wait
-     * for Grindr's internal token refresh to complete.
+     * Replaces the dirty incognito toggle workaround with a bold manual POST
+     * direct to /v8/sessions to refresh the user's presence natively.
      */
-    fun refreshSessionViaIncognito(): Boolean {
+    fun refreshSession(geohash: String): Boolean {
         try {
-            val settingsUrl = "https://grindr.mobi/v3/me/prefs/settings"
+            val sessionsUrl = "https://grindr.mobi/v8/sessions"
             val jsonHeaders = mapOf("Content-Type" to "application/json; charset=UTF-8")
 
-            // Step 1: Force incognito to false (reset to known state).
-            // If it was already false this is a no-op server-side;
-            // if it was true, this triggers a websocket reconnect which
-            // invalidates the current auth token.
-            val offBody = """{"settings":{"incognito":false}}""".toRequestBody()
-            val offResponse = sendRequest(settingsUrl, "PUT", body = offBody, headers = jsonHeaders)
-            if (!offResponse.isSuccessful) {
-                offResponse.useBody { errorBody ->
-                    Logger.w("Incognito reset to false failed (${offResponse.code}): $errorBody")
+            // We omit email, authToken, and token since the interceptor will
+            // add the `Authorization` header containing the valid token.
+            // If Grindr throws a 400 Bad Request, we'll need to extract them from userSession.
+            val body = """{"geohash":"$geohash"}""".toRequestBody()
+            
+            val response = sendRequest(sessionsUrl, "POST", body = body, headers = jsonHeaders)
+
+            if (!response.isSuccessful) {
+                response.useBody { errorBody ->
+                    Logger.w("Manual session refresh failed (${response.code}): $errorBody")
                 }
-                // Non-fatal: the state change may have still occurred server-side
-                // before the 401 was returned. Continue to step 2.
+                return false
             } else {
-                offResponse.close()
+                response.close()
+                Logger.d("Session successfully refreshed manually for geohash $geohash", LogSource.MODULE)
+                return true
             }
-
-            // Wait for websocket reconnect cycle to complete.
-            // Analysis shows the cycle takes ~1-2s, and a 500ms gap caused
-            // the ON PUT to arrive with a stale token → 401 → no state change.
-            Thread.sleep(2500)
-
-            // Step 2: Set incognito to true. Server should now be in the
-            // false state, so this is a real state change → Grindr fires
-            // POST /v8/sessions. Retry on 401 (token may still be refreshing).
-            val onBody = """{"settings":{"incognito":true}}""".toRequestBody()
-            var onResponse = sendRequest(settingsUrl, "PUT", body = onBody, headers = jsonHeaders)
-            var retryCount = 0
-            while (onResponse.code == 401 && retryCount < 3) {
-                onResponse.close()
-                Logger.d("Incognito ON got 401, retrying (${retryCount + 1}/3)...")
-                Thread.sleep(1500)
-                onResponse = sendRequest(settingsUrl, "PUT", body = onBody, headers = jsonHeaders)
-                retryCount++
-            }
-
-            if (!onResponse.isSuccessful) {
-                onResponse.useBody { errorBody ->
-                    Logger.w("Incognito set to true failed (${onResponse.code}): $errorBody")
-                }
-                // Even if this failed, the OFF toggle may have already
-                // triggered a session refresh. Return true to avoid
-                // unnecessary error toasts.
-                return retryCount > 0
-            } else {
-                onResponse.close()
-            }
-
-            return true
         } catch (e: Exception) {
-            Logger.w("Session refresh via incognito failed: ${e.message}")
+            Logger.w("Manual session refresh failed: ${e.message}")
             return false
         }
     }

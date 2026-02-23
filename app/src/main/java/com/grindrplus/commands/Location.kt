@@ -304,7 +304,7 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
                 val success = GrindrPlus.httpClient.updateLocation(geohash)
                 if (success) {
                     try {
-                        val refreshed = GrindrPlus.httpClient.refreshSessionViaIncognito()
+                        val refreshed = GrindrPlus.httpClient.refreshSession(geohash)
                         if (!refreshed) {
                             Logger.w("Session refresh failed after disabling teleport")
                             GrindrPlus.showToast(Toast.LENGTH_LONG,
@@ -339,19 +339,15 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
                 GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $label")
             }
             try {
-                // Location PUT may return 401 if the token was invalidated
-                // by a previous incognito toggle. This is actually fine —
-                // Grindr's internal code auto-refreshes the session on 401,
-                // and that refresh includes the current geohash.
                 val locationSuccess = GrindrPlus.httpClient.updateLocation(geohash)
                 if (!locationSuccess) {
-                    Logger.w("Location PUT returned non-200 (likely 401) — Grindr will auto-refresh")
+                    Logger.w("Location PUT returned non-200")
                 }
 
-                // Always attempt the incognito toggle to force a session
-                // refresh with the new geohash.
+                // Fire a manual POST to /v8/sessions with the new geohash
+                // so others immediately see the updated location.
                 try {
-                    GrindrPlus.httpClient.refreshSessionViaIncognito()
+                    GrindrPlus.httpClient.refreshSession(geohash)
                 } catch (e: Exception) {
                     Logger.w("Session refresh after teleport failed: ${e.message}")
                 }

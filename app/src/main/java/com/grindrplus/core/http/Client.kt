@@ -223,22 +223,26 @@ class Client(interceptor: Interceptor) {
     }
 
     /**
-     * Sends a manual POST to /v8/sessions with the full payload that Grindr
-     * expects: {email, authToken, token, geohash}.
+     * Sends a manual POST to /v8/sessions to refresh the user's presence
+     * in the cascade grid at the new location.
      *
-     * - authToken: extracted from the userSession StateFlow (same source the
-     *   Interceptor uses for the Authorization header).
-     * - token: the Firebase/push token stored in userSession.
-     * - email: decoded from the JWT authToken payload (sub or email claim),
-     *   or extracted from userSession directly.
-     * - geohash: the new location hash.
+     * Based on mitmproxy analysis, the payload structure is:
+     * {
+     *   "email":     "user@example.com",          -- user's login email
+     *   "authToken": "eb082524fa48628...",          -- 64-char hex session hash (NOT the JWT!)
+     *   "token":     "dtDLizl...:APA91bGx...",     -- Firebase Cloud Messaging push token
+     *   "geohash":   "sg4prgvx4yd0"                -- location geohash
+     * }
+     *
+     * The JWT goes only in the Authorization header (handled by Interceptor).
+     * All three body fields are extracted from the userSession instance by
+     * enumerating its String-returning methods and classifying by format.
      */
     fun refreshSession(geohash: String): Boolean {
         try {
             val sessionsUrl = "https://grindr.mobi/v8/sessions"
             val jsonHeaders = mapOf("Content-Type" to "application/json; charset=UTF-8")
 
-            // --- Extract authToken from userSession via InstanceManager ---
             val userSessionInstance = GrindrPlus.instanceManager
                 .getInstance<Any>(GrindrPlus.userSession)
 
@@ -247,60 +251,56 @@ class Client(interceptor: Interceptor) {
                 return false
             }
 
-            // authToken: method "x" returns StateFlow<String>, call getValue()
-            val authToken = try {
-                val flow = userSessionInstance.javaClass.getMethod("x")
-                    .invoke(userSessionInstance)
-                flow?.javaClass?.getMethod("getValue")?.invoke(flow) as? String ?: ""
-            } catch (e: Exception) {
-                Logger.w("Failed to extract authToken: ${e.message}")
-                ""
+            // Extract all string values from userSession methods
+            val sessionStrings = extractAllSessionStrings(userSessionInstance)
+
+            // Classify the extracted strings by their format
+            var email = ""
+            var authTokenHex = ""
+            var fcmToken = ""
+
+            for ((methodName, value) in sessionStrings) {
+                when {
+                    // Firebase FCM token: contains ":" and typically "APA91b" or similar
+                    value.contains(":") && value.length > 50 -> {
+                        fcmToken = value
+                        Logger.d("Session field 'token' (FCM) from method=$methodName (len=${value.length})")
+                    }
+                    // Email: contains "@"
+                    value.contains("@") && value.contains(".") -> {
+                        email = value
+                        Logger.d("Session field 'email' from method=$methodName")
+                    }
+                    // 64-char hex hash: exactly 64 hex chars, no dots
+                    value.length == 64 && value.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' } -> {
+                        authTokenHex = value
+                        Logger.d("Session field 'authToken' (hex) from method=$methodName")
+                    }
+                }
             }
 
-            if (authToken.isEmpty()) {
-                Logger.w("Cannot refresh session: authToken is empty")
+            // Log what we found for debugging
+            Logger.d("Session refresh payload — " +
+                    "email: ${if (email.isNotEmpty()) "${email.take(3)}***" else "(empty)"}, " +
+                    "authToken(hex): ${if (authTokenHex.isNotEmpty()) "${authTokenHex.take(8)}..." else "(empty)"}, " +
+                    "token(fcm): ${if (fcmToken.isNotEmpty()) "${fcmToken.take(12)}..." else "(empty)"}, " +
+                    "geohash: $geohash")
+
+            if (email.isEmpty() || authTokenHex.isEmpty()) {
+                Logger.w("Cannot refresh session: missing email or authToken. " +
+                        "Found ${sessionStrings.size} string methods on userSession.")
+                // Dump all candidates for debugging
+                sessionStrings.forEach { (name, value) ->
+                    Logger.d("  userSession.$name() = \"${value.take(30)}...\" (len=${value.length})")
+                }
                 return false
             }
 
-            // email: decode from JWT payload (middle segment, base64)
-            val email = try {
-                val parts = authToken.split(".")
-                if (parts.size >= 2) {
-                    val payloadJson = String(
-                        android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING),
-                        Charsets.UTF_8
-                    )
-                    val payload = JSONObject(payloadJson)
-                    // Try common JWT claims for email
-                    payload.optString("email", "")
-                        .ifEmpty { payload.optString("sub", "") }
-                } else ""
-            } catch (e: Exception) {
-                Logger.w("Failed to decode email from JWT: ${e.message}")
-                ""
-            }
-
-            // token: try common method names on userSession for the push/session token
-            // In the obfuscated code, we look for a method returning a non-JWT string.
-            // First try to find it by enumerating no-arg String-returning methods.
-            val token = try {
-                extractSessionToken(userSessionInstance, authToken)
-            } catch (e: Exception) {
-                Logger.w("Failed to extract session token: ${e.message}")
-                ""
-            }
-
-            // Log what we got for debugging
-            Logger.d("Session refresh payload — email: ${email.take(3)}***, " +
-                    "authToken: ${authToken.take(10)}..., " +
-                    "token: ${if (token.isNotEmpty()) "${token.take(10)}..." else "(empty)"}, " +
-                    "geohash: $geohash")
-
-            // Build the full payload
+            // Build the payload
             val bodyJson = JSONObject().apply {
                 put("email", email)
-                put("authToken", authToken)
-                put("token", token)
+                put("authToken", authTokenHex)
+                put("token", fcmToken)
                 put("geohash", geohash)
             }
 
@@ -309,7 +309,9 @@ class Client(interceptor: Interceptor) {
 
             if (!response.isSuccessful) {
                 response.useBody { errorBody ->
-                    Logger.w("Manual session refresh failed (${response.code}): $errorBody")
+                    // Truncate to avoid dumping full Cloudflare HTML pages into logcat
+                    val truncated = if ((errorBody?.length ?: 0) > 200) errorBody?.take(200) + "..." else errorBody
+                    Logger.w("Session refresh failed (${response.code}): $truncated")
                 }
                 return false
             } else {
@@ -318,45 +320,38 @@ class Client(interceptor: Interceptor) {
                 return true
             }
         } catch (e: Exception) {
-            Logger.w("Manual session refresh failed: ${e.message}")
+            Logger.w("Session refresh failed: ${e.message}")
             return false
         }
     }
 
     /**
-     * Tries to find the push/session token from the userSession instance.
-     * Enumerates all public no-arg methods returning String, filters out
-     * the known authToken (JWT) and roles, and picks the most likely candidate.
+     * Enumerates all no-arg String-returning methods on the userSession instance
+     * and returns their name→value pairs, filtering out empty/short values and
+     * known non-interesting ones (roles JSON, etc).
      */
-    private fun extractSessionToken(userSession: Any, authToken: String): String {
-        val candidates = mutableListOf<Pair<String, String>>()
+    private fun extractAllSessionStrings(userSession: Any): List<Pair<String, String>> {
+        val results = mutableListOf<Pair<String, String>>()
 
         for (method in userSession.javaClass.declaredMethods) {
-            if (method.parameterCount == 0 && method.returnType == String::class.java) {
-                try {
-                    method.isAccessible = true
-                    val value = method.invoke(userSession) as? String ?: continue
-                    // Skip empty, the authToken itself, obvious role strings, and very short values
-                    if (value.isEmpty()) continue
-                    if (value == authToken) continue
-                    if (value.startsWith("[")) continue // roles JSON
-                    if (value.length < 10) continue // too short to be a token
-                    candidates.add(method.name to value)
-                } catch (_: Exception) {
-                    // skip methods that throw
-                }
+            if (method.parameterCount != 0) continue
+            if (method.returnType != String::class.java) continue
+            try {
+                method.isAccessible = true
+                val value = method.invoke(userSession) as? String ?: continue
+                if (value.isEmpty()) continue
+                if (value.length < 5) continue          // skip very short values
+                if (value.startsWith("[")) continue      // roles JSON array
+                results.add(method.name to value)
+            } catch (_: Exception) {
+                // skip methods that throw
             }
         }
 
-        // Log all candidates for debugging
-        candidates.forEach { (name, value) ->
-            Logger.d("Session token candidate: method=$name, value=${value.take(20)}... (len=${value.length})")
-        }
+        // Also check StateFlow<String> fields (like the JWT authToken flow)
+        // We skip these for the body payload since the JWT goes in the header only.
 
-        // Prefer the longest non-JWT string (Firebase tokens are typically 100+ chars)
-        return candidates
-            .filter { !it.second.contains(".") || it.second.count { c -> c == '.' } != 2 } // exclude JWTs
-            .maxByOrNull { it.second.length }?.second ?: ""
+        return results
     }
 
     fun reportUser(

@@ -51,16 +51,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.grindrplus.core.Config
 import com.grindrplus.manager.settings.ApiKeyTestDialog
 import com.grindrplus.manager.settings.ButtonSetting
@@ -96,6 +100,19 @@ fun SettingsScreen(
     val apiKeyTestMessage by viewModel.apiKeyTestMessage.collectAsState()
     val apiKeyTestRawResponse by viewModel.apiKeyTestRawResponse.collectAsState()
     val apiKeyTestLoading by viewModel.apiKeyTestLoading.collectAsState()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadSettings()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     if (debugLogsScreen) {
         DebugLogsScreen(
@@ -583,7 +600,7 @@ fun ImprovedTextSetting(
     onChanged: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf(setting.value) }
+    var text by remember(setting.value) { mutableStateOf(setting.value) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -769,7 +786,7 @@ fun ImprovedTextSettingWithButtons(
     onChanged: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf(setting.value) }
+    var text by remember(setting.value) { mutableStateOf(setting.value) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(

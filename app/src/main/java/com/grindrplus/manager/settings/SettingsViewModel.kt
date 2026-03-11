@@ -74,6 +74,7 @@ class SettingsViewModel(
             _isLoading.value = true
 
             try {
+                Config.initialize(Config.getCurrentPackage())
                 val hooks = Config.getHooksSettings()
                 val hookSettings = hooks
                     .filterNot { (hookName, _) -> hookName in hookHideList }

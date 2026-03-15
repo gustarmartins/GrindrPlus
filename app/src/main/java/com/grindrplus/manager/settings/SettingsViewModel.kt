@@ -106,7 +106,29 @@ class SettingsViewModel(
                             }
                         }
                     )
-                }
+                } + listOf(
+                    TextSetting(
+                        id = "always_online_interval_mins",
+                        title = "Always Online interval (mins)",
+                        description = "How often to fetch cascade to stay online (default: 5)",
+                        value = (Config.get("always_online_interval_mins", 5) as Number).toString(),
+                        onValueChange = {
+                            val value = it.toIntOrNull() ?: 5
+                            viewModelScope.launch {
+                                Config.put("always_online_interval_mins", value)
+                                loadSettings()
+                            }
+                        },
+                        keyboardType = KeyboardType.Number,
+                        validator = { input ->
+                            val value = input.toIntOrNull()
+                            when {
+                                value == null || value <= 0 -> "Must be a positive number"
+                                else -> null
+                            }
+                        }
+                    )
+                )
 
                 val otherSettings = mutableListOf(
                     TextSetting(

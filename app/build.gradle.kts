@@ -20,8 +20,8 @@ android {
         applicationId = "com.grindrplus"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "4.8.0-${grindrVersionName.let { it.joinToString("_") }}_$gitCommitHash"
+        versionCode = 15
+        versionName = "4.8.0.RC-${grindrVersionName.let { it.joinToString("_") }}_$gitCommitHash"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

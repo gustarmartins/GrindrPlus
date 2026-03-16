@@ -71,7 +71,13 @@ class HomeViewModel : ViewModel() {
             }
         }
         // in this case the connection was blocked by something out of our control
-        return Result.failure(Exception("Connection to $url refused. Please check your VPN, Proxy or AdBlocker settings.", lastException))
+        return when (lastException) {
+            is UnknownHostException -> Result.failure(lastException)
+            else -> Result.failure(Exception(
+                "Connection to $url refused. Please check your VPN, Proxy or AdBlocker settings.",
+                lastException
+            ))
+        }
     }
 
     private suspend fun parseContributors(jsonContent: String) = withContext(Dispatchers.Default) {

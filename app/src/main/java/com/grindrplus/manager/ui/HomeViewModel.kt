@@ -8,11 +8,14 @@ import com.grindrplus.core.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import java.io.IOException
+import java.net.UnknownHostException
 import java.time.Instant
 
 data class Release(
@@ -27,6 +30,7 @@ class HomeViewModel : ViewModel() {
     val contributors = mutableStateMapOf<String, String>()
     val releases = mutableStateMapOf<String, Release>()
     val isLoading = mutableStateOf(true)
+    val loadingText = mutableStateOf("Fetching latest updates...")
     val errorMessage = mutableStateOf<String?>(null)
 
     // Flag to avoid multiple fetches
@@ -40,21 +44,34 @@ class HomeViewModel : ViewModel() {
         // Reuse the HTTP client across requests
         private val client = OkHttpClient()
     }
+    
+    private fun fetchUrlContent(url: String): Result<String> {
+        val maxRetries = 3
+        var lastException: Exception? = null
 
-    private suspend fun fetchUrlContent(url: String): String {
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "application/vnd.github.v3+json")
-            .build()
+        for (attempt in 1..maxRetries) {
+            try {
+                Logger.d("$TAG: Fetching content from $url (Attempt $attempt/$maxRetries)")
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .build()
 
-        return withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw Exception("Failed to fetch data: ${response.message}")
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw IOException("Server error: ${response.code}")
+                    val body = response.body?.string() ?: throw IOException("Empty response body")
+                    return Result.success(body)
                 }
-                response.body?.string() ?: throw Exception("Empty response body")
+            } catch (e: Exception) {
+                lastException = e
+                Logger.e("$TAG: Attempt $attempt at fetching data failed: ${e.message}")
+                if (attempt < maxRetries) {
+                    Thread.sleep(2000)
+                }
             }
         }
+        // in this case the connection was blocked by something out of our control
+        return Result.failure(Exception("Connection to $url refused. Please check your VPN, Proxy or AdBlocker settings.", lastException))
     }
 
     private suspend fun parseContributors(jsonContent: String) = withContext(Dispatchers.Default) {
@@ -94,26 +111,47 @@ class HomeViewModel : ViewModel() {
     fun fetchData(forceRefresh: Boolean = false) {
         if (hasFetched && !forceRefresh) return
         if (forceRefresh) {
-            hasFetched = false
             errorMessage.value = null
         }
-        hasFetched = true
         isLoading.value = true
+        loadingText.value = "Fetching latest updates..."
 
         viewModelScope.launch {
+            val textUpdateJob = launch {
+                delay(10000)
+                loadingText.value = "Still fetching... Check your internet connectivity."
+            }
             try {
                 coroutineScope {
-                    // Both requests are made in parallel
-                    val contributorsDeferred = async { fetchUrlContent(CONTRIBUTORS_URL) }
-                    val releasesDeferred = async { fetchUrlContent(RELEASES_URL) }
+                    val contributorsDeferred = async(Dispatchers.IO) { fetchUrlContent(CONTRIBUTORS_URL) }
+                    val releasesDeferred = async(Dispatchers.IO) { fetchUrlContent(RELEASES_URL) }
+                    
+                    val contributorsResult = contributorsDeferred.await()
+                    val releasesResult = releasesDeferred.await()
+                    
+                    // this blocks the "still fetching..." in case it finishes early
+                    textUpdateJob.cancel() 
 
-                    parseContributors(contributorsDeferred.await())
-                    parseReleases(releasesDeferred.await())
+                    val contributorsError = contributorsResult.exceptionOrNull()
+                    val releasesError = releasesResult.exceptionOrNull()
+
+                    if (contributorsResult.isSuccess && releasesResult.isSuccess) {
+                        parseContributors(contributorsResult.getOrThrow())
+                        parseReleases(releasesResult.getOrThrow())
+                        
+                        hasFetched = true
+                    } else {
+                        throw contributorsError ?: releasesError ?: Exception("Unknown fetch error")
+                    }
                 }
+            } catch (e: UnknownHostException) {
+                Logger.e("$TAG: No internet connection: ${e.message}")
+                errorMessage.value = "No internet connection. Please check your network and try again."
             } catch (e: Exception) {
-                Logger.e("$TAG: Error fetching data: ${e.message}")
-                errorMessage.value = "An error occurred: ${e.message}"
-            } finally {
+            Logger.e("$TAG: Error fetching data: ${e.message}")
+            errorMessage.value = e.message ?: "An error occurred: ${e.localizedMessage}"
+        } finally { 
+            textUpdateJob.cancel()
                 isLoading.value = false
             }
         }

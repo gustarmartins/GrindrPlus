@@ -26,15 +26,17 @@ import com.grindrplus.utils.RetrofitUtils.getSuccessValue
 import com.grindrplus.utils.RetrofitUtils.isFail
 import com.grindrplus.utils.RetrofitUtils.isGET
 import com.grindrplus.utils.RetrofitUtils.isPUT
+import com.grindrplus.utils.RetrofitUtils.isResult
 import com.grindrplus.utils.RetrofitUtils.isSuccess
 import com.grindrplus.utils.hook
 import com.grindrplus.utils.hookConstructor
+import com.grindrplus.utils.withSuspendResult
 import de.robv.android.xposed.XposedHelpers.getObjectField
 import de.robv.android.xposed.XposedHelpers.setObjectField
-import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import java.io.Closeable
 import java.io.IOException
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 
 class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlimited albums") {
     private val albumsService = "tk.a" // search for 'v1/albums/red-dot'
@@ -55,22 +57,31 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
         RetrofitUtils.hookService(
             albumsServiceClass,
         ) { originalHandler, proxy, method, args ->
-            return@hookService RetrofitUtils.invokeAndReplaceResult(originalHandler, proxy, method, args) { result ->
-                try {
-                    when {
-                        method.isGET("v2/albums/{albumId}") -> handleGetAlbum(args, result)
-                        method.isGET("v1/albums") -> handleGetAlbums(args, result)
-                        method.isGET("v2/albums/shares") -> handleGetAlbumsShares(args, result)
-                        method.isGET("v2/albums/shares/{profileId}") -> handleGetAlbumsSharesProfileId(args, result)
-                        method.isGET("v3/albums/{albumId}/view") -> handleGetAlbumsViewAlbumId(args, result)
-                        method.isPUT("v1/albums/{albumId}/shares/remove") -> handleRemoveAlbumShares(args, result)
-                        else -> result
-                    }
-                } catch (e: Exception) {
-                    loge("Error handling album request: ${e.message}")
-                    Logger.writeRaw(e.stackTraceToString())
-                    result
+            val result = originalHandler.invoke(proxy, method, args)
+
+            // Possible crash fix, currently disabled because it breaks this feature entirely.
+            /*
+            if (!result.isResult())
+                return@hookService result
+            */
+
+            try {
+                when {
+                    method.isGET("v2/albums/{albumId}") -> handleGetAlbum(args, result)
+                    method.isGET("v1/albums") -> handleGetAlbums(args, result)
+                    method.isGET("v2/albums/shares") -> handleGetAlbumsShares(args, result)
+                    method.isGET("v2/albums/shares/{profileId}") ->
+                        handleGetAlbumsSharesProfileId(args, result)
+                    method.isGET("v3/albums/{albumId}/view") ->
+                        handleGetAlbumsViewAlbumId(args, result)
+                    method.isPUT("v1/albums/{albumId}/shares/remove") ->
+                        handleRemoveAlbumShares(args, result)
+                    else -> result
                 }
+            } catch (e: Exception) {
+                loge("Error handling album request: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+                result
             }
         }
 
@@ -161,13 +172,14 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
         }
     }
 
-    private fun handleRemoveAlbumShares(args: Array<Any?>, result: Any): Any {
-            val albumId = args[0] as? Long ?: return result
+    private fun handleRemoveAlbumShares(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
+            val albumId = args[0] as? Long ?: return@withSuspendResult result
             logi("Removing album shares for ID: $albumId")
 
             if (result.isFail()) {
                 try {
-                    return runBlocking {
+                    runBlocking {
                         GrindrPlus.database.withTransaction {
                             val dao = GrindrPlus.database.albumDao()
                             val albumToDelete = dao.getAlbum(albumId)
@@ -184,15 +196,16 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                 } catch (e: Exception) {
                     loge("Failed to delete album $albumId: ${e.message}")
                     Logger.writeRaw(e.stackTraceToString())
-                    return result
+                    result
                 }
             } else {
-                return result
+                result
             }
         }
 
-    private fun handleGetAlbumsViewAlbumId(args: Array<Any?>, result: Any): Any {
-            val albumId = args[0] as? Long ?: return result
+    private fun handleGetAlbumsViewAlbumId(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
+            val albumId = args[0] as? Long ?: return@withSuspendResult result
             logd("Checking if album $albumId is viewable")
 
             if (!result.isSuccess()) {
@@ -210,36 +223,37 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                 }
             }
 
-            return result
+            result
         }
 
-    private fun handleGetAlbum(args: Array<Any?>, result: Any): Any {
-        val albumId = args[0] as? Long ?: return result
-        logd("Fetching album with ID: $albumId: ${result.javaClass.name}: $result")
+    private fun handleGetAlbum(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
+            val albumId = args[0] as? Long ?: return@withSuspendResult result
+            logd("Fetching album with ID: $albumId")
 
-        try {
-            GrindrPlus.httpClient
-                .sendRequest(url = "https://grindr.mobi/v1/albums/$albumId", method = "GET")
-                .use { response ->
-                    val responseBody = response.body?.string()
-                    if (!responseBody.isNullOrEmpty()) {
-                        logd("Got ${responseBody.length} bytes for album $albumId")
-                        val modifiedResult = parseAlbumContent(albumId, responseBody, result)
-                        return modifiedResult
-                    } else {
-                        loge("Empty response body for album $albumId")
-                        val modifiedResult = fetchAlbumFromDatabase(albumId, result)
-                        return modifiedResult
+            try {
+                GrindrPlus.httpClient
+                    .sendRequest(url = "https://grindr.mobi/v1/albums/$albumId", method = "GET")
+                    .use { response ->
+                        val responseBody = response.body?.string()
+                        if (!responseBody.isNullOrEmpty()) {
+                            logd("Got ${responseBody.length} bytes for album $albumId")
+                            val modifiedResult = parseAlbumContent(albumId, responseBody, result)
+                            return@withSuspendResult modifiedResult
+                        } else {
+                            loge("Empty response body for album $albumId")
+                            val modifiedResult = fetchAlbumFromDatabase(albumId, result)
+                            return@withSuspendResult modifiedResult
+                        }
                     }
-                }
-        } catch (e: Exception) {
-            loge("Failed to fetch album $albumId: ${e.message}")
-            Logger.writeRaw(e.stackTraceToString())
-            GrindrPlus.showToast(Toast.LENGTH_LONG, "Failed to load album")
-            val modifiedResult = fetchAlbumFromDatabase(albumId, result)
-            return modifiedResult
+            } catch (e: Exception) {
+                loge("Failed to fetch album $albumId: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+                GrindrPlus.showToast(Toast.LENGTH_LONG, "Failed to load album")
+                val modifiedResult = fetchAlbumFromDatabase(albumId, result)
+                return@withSuspendResult modifiedResult
+            }
         }
-    }
 
     private fun fetchAlbumFromDatabase(albumId: Long, originalResult: Any): Any {
         try {
@@ -353,63 +367,65 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun handleGetAlbums(args: Array<Any?>, result: Any): Any {
-        if (result.isSuccess()) {
-            try {
-                val albums = getObjectField(result.getSuccessValue(), "albums") as? List<Any>
-                if (albums != null) {
-                    runBlocking {
-                        GrindrPlus.database.withTransaction {
-                            albums.forEach { album ->
-                                try {
-                                    saveAlbum(album)
-                                } catch (e: Exception) {
-                                    loge("Error saving album: ${e.message}")
-                                    Logger.writeRaw(e.stackTraceToString())
+    private fun handleGetAlbums(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
+            if (result.isSuccess()) {
+                try {
+                    val albums = getObjectField(result.getSuccessValue(), "albums") as? List<Any>
+                    if (albums != null) {
+                        runBlocking {
+                            GrindrPlus.database.withTransaction {
+                                albums.forEach { album ->
+                                    try {
+                                        saveAlbum(album)
+                                    } catch (e: Exception) {
+                                        loge("Error saving album: ${e.message}")
+                                        Logger.writeRaw(e.stackTraceToString())
+                                    }
                                 }
                             }
                         }
                     }
+                } catch (e: Exception) {
+                    loge("Error processing albums: ${e.message}")
+                    Logger.writeRaw(e.stackTraceToString())
                 }
-            } catch (e: Exception) {
-                loge("Error processing albums: ${e.message}")
-                Logger.writeRaw(e.stackTraceToString())
             }
-        }
 
-        try {
-            val albums = runBlocking {
-                GrindrPlus.database.withTransaction {
-                    val dao = GrindrPlus.database.albumDao()
-                    val dbAlbums = dao.getAlbums()
-                    dbAlbums.mapNotNull {
-                        try {
-                            val dbContent = dao.getAlbumContent(it.id)
-                            it.toGrindrAlbum(dbContent)
-                        } catch (e: Exception) {
-                            loge("Error converting album ${it.id}: ${e.message}")
-                            Logger.writeRaw(e.stackTraceToString())
-                            null
+            try {
+                val albums = runBlocking {
+                    GrindrPlus.database.withTransaction {
+                        val dao = GrindrPlus.database.albumDao()
+                        val dbAlbums = dao.getAlbums()
+                        dbAlbums.mapNotNull {
+                            try {
+                                val dbContent = dao.getAlbumContent(it.id)
+                                it.toGrindrAlbum(dbContent)
+                            } catch (e: Exception) {
+                                loge("Error converting album ${it.id}: ${e.message}")
+                                Logger.writeRaw(e.stackTraceToString())
+                                null
+                            }
                         }
                     }
                 }
+
+                val newValue =
+                    findClass(albumsList)
+                        .getConstructor(List::class.java)
+                        .newInstance(albums)
+
+                createSuccess(newValue)
+            } catch (e: Exception) {
+                loge("Error creating albums list: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+                result
             }
-
-            val newValue =
-                findClass(albumsList)
-                    .getConstructor(List::class.java)
-                    .newInstance(albums)
-
-            return createSuccess(newValue)
-        } catch (e: Exception) {
-            loge("Error creating albums list: ${e.message}")
-            Logger.writeRaw(e.stackTraceToString())
-            return result
         }
-    }
 
     @Suppress("UNCHECKED_CAST")
-    private fun handleGetAlbumsShares(args: Array<Any?>, result: Any): Any {
+    private fun handleGetAlbumsShares(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
             logd("Fetching shared albums")
             if (result.isSuccess()) {
                 try {
@@ -470,20 +486,20 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                         .getConstructor(List::class.java)
                         .newInstance(albumBriefs)
 
-                return createSuccess(newValue)
+                createSuccess(newValue)
             } catch (e: Exception) {
                 loge("Error creating shared albums brief: ${e.message}")
                 Logger.writeRaw(e.stackTraceToString())
-                return result
+                result
             }
         }
 
     @Suppress("UNCHECKED_CAST")
-    private fun handleGetAlbumsSharesProfileId(args: Array<Any?>, result: Any): Any {
+    private fun handleGetAlbumsSharesProfileId(args: Array<Any?>, result: Any) =
+        withSuspendResult(args, result) { args, result ->
+            logd("Fetching shared albums for profile ID")
 
-            val profileId = args[0] as? Long ?: return result
-
-            logd("Fetching shared albums for profile ID $profileId: ${result.javaClass.name}: $result")
+            val profileId = args[0] as? Long ?: return@withSuspendResult result
 
             if (result.isSuccess()) {
                 try {
@@ -544,10 +560,10 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                         .getConstructor(List::class.java)
                         .newInstance(albumBriefs)
 
-                return createSuccess(newValue)
+                createSuccess(newValue)
             } catch (e: Exception) {
                 loge("Error creating shared albums brief: ${e.message}")
-                return result
+                result
             }
         }
 

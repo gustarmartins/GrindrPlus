@@ -109,6 +109,45 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
             }
         }
 
+        // pressie
+        findClass("com.grindrapp.android.albums.data.model.Album").hookConstructor(HookStage.AFTER) { param ->
+            try {
+                setObjectField(param.thisObject(), "albumViewable", true)
+            } catch (e: Exception) {
+                loge("Error making fresh album viewable: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
+        findClass("com.grindrapp.android.albums.data.model.fresh.FreshContent").hookConstructor(HookStage.AFTER) { param ->
+            try {
+                setObjectField(param.thisObject(), "albumViewable", true)
+            } catch (e: Exception) {
+                loge("Error making fresh album content viewable: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
+        findClass("com.grindrapp.android.albums.data.model.fresh.FreshFeedContent").hookConstructor(HookStage.AFTER) { param ->
+            try {
+                val allowStatus = findClass("com.grindrapp.android.albums.data.model.fresh.FreshPaywallStatus").getField("Allow").get(null)
+                setObjectField(param.thisObject(), "paywallStatus", allowStatus)
+            } catch (e: Exception) {
+                loge("Error marking fresh feed content allowed: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
+        findClass("com.grindrapp.android.albums.domain.model.FreshData").hookConstructor(HookStage.AFTER) { param ->
+            try {
+                val unlockedStatus = findClass("com.grindrapp.android.albums.domain.model.FreshPaywallStatus").getField("Unlocked").get(null)
+                setObjectField(param.thisObject(), "paywallStatus", unlockedStatus)
+            } catch (e: Exception) {
+                loge("Error marking fresh data unlocked: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
         findClass(albumModel).hook("isValid", HookStage.BEFORE) { param -> param.setResult(true) }
     }
 
@@ -181,7 +220,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                                 dao.deleteAlbum(albumId)
                                 createSuccess(albumId)
                             } else {
-                                logd("Album with ID $albumId not found in the database")
+                                logd("Album with ID $albumId not found in the database.")
                                 result
                             }
                         }

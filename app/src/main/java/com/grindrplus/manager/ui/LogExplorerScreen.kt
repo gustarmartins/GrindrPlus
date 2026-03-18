@@ -23,13 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,25 +36,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -90,7 +69,6 @@ enum class LogType {
 
 data class LogEntry(
     val timestamp: String?,
-    val category: String = "unknown",
     val message: String,
     val type: LogType
 )
@@ -98,14 +76,8 @@ data class LogEntry(
 @Composable
 fun DebugLogsScreen(
     onBack: () -> Unit,
-    viewModel: LogExplorerViewModel = viewModel()
 ) {
-    val displayLogs by viewModel.displayLogs.collectAsStateWithLifecycle()
-    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
-    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val hiddenCategories by viewModel.hiddenCategoriesState.collectAsStateWithLifecycle()
-    val allCategories by viewModel.allCategories.collectAsStateWithLifecycle()
-    var showFilterSheet by remember { mutableStateOf(false) }
+    var logs by remember { mutableStateOf(emptyList<LogEntry>()) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -127,18 +99,9 @@ fun DebugLogsScreen(
 
                 fun parseLogs(logs: List<String>) =
                     logs.map {
-                        val splitIndex = it.indexOf(": ")
-                        val prefix = if (splitIndex != -1) it.substring(0, splitIndex) else "unknown"
-                        val messageBody = if (splitIndex != -1) it.substring(splitIndex + 2) else it
-
-                        val splitPrefix = prefix.split("/")
-                        val timestamp = if (splitPrefix.size > 1) splitPrefix[1] else null
-                        val categoryStr = splitPrefix.drop(2).joinToString("/")
-
                         LogEntry(
-                            timestamp = timestamp,
-                            category = if (categoryStr.isEmpty() || categoryStr == "unknown") "unknown" else categoryStr,
-                            message = messageBody,
+                            timestamp = null,
+                            message = it,
                             type = when {
                                 it.startsWith("I") -> LogType.INFO
                                 it.startsWith("W") -> LogType.WARNING
@@ -150,7 +113,7 @@ fun DebugLogsScreen(
                         )
                     }
 
-                viewModel.setLogs(parseLogs(log.readLines()))
+                logs = parseLogs(log.readLines())
 
                 val watchService = FileSystems.getDefault().newWatchService()
 
@@ -165,7 +128,7 @@ fun DebugLogsScreen(
                     for (event in key.pollEvents()) {
                         if (event.context() == log.name) {
                             val newLog = log.readLines()
-                            viewModel.setLogs(parseLogs(newLog))
+                            logs = parseLogs(newLog)
                         }
                     }
 
@@ -230,94 +193,6 @@ fun DebugLogsScreen(
         )
     }
 
-    if (showFilterSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showFilterSheet = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Filter Categories",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    if (hiddenCategories.isNotEmpty()) {
-                        Button(
-                            onClick = { viewModel.showAllCategories() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        ) {
-                            Text("Show All")
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (allCategories.isEmpty()) {
-                    Text(
-                        text = "No categories found yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-                } else {
-                    Text(
-                        text = "${hiddenCategories.size} of ${allCategories.size} hidden",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    allCategories.sorted().let { sortedCategories ->
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(sortedCategories) { category ->
-                                val isVisible = category !in hiddenCategories
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { viewModel.toggleCategoryHidden(category) }
-                                        .padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = category,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = if (isVisible)
-                                            MaterialTheme.colorScheme.onSurface
-                                        else
-                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Switch(
-                                        checked = isVisible,
-                                        onCheckedChange = { viewModel.toggleCategoryHidden(category) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     Scaffold(
         snackbarHost = {
             SnackbarHost(
@@ -325,82 +200,20 @@ fun DebugLogsScreen(
                 modifier = Modifier.padding(bottom = 80.dp)
             )
         },
-        floatingActionButton = {
-            if (!isSearching) {
-                FloatingActionButton(
-                    onClick = { showFilterSheet = true },
-                    containerColor = if (hiddenCategories.isNotEmpty())
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    BadgedBox(
-                        badge = {
-                            if (hiddenCategories.isNotEmpty()) {
-                                Badge {
-                                    Text(hiddenCategories.size.toString())
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = "Filter categories"
-                        )
-                    }
-                }
-            }
-        },
         topBar = {
             TopAppBar(
-                title = {
-                    if (isSearching) {
-                        val focusRequester = remember { FocusRequester() }
-                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.searchQuery.value = it },
-                            placeholder = { Text("Search logs...") },
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
-                        )
-                    } else {
-                        Text("Logs")
-                    }
-                },
+                title = { Text("Logs") },
                 navigationIcon = {
-                    if (isSearching) {
-                        IconButton(onClick = { viewModel.setSearching(false) }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Close Search")
-                        }
-                    } else {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Back",
-                                modifier = Modifier.rotate(180f)
-                            )
-                        }
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Back",
+                            modifier = Modifier.rotate(180f)
+                        )
                     }
                 },
                 actions = {
-                    if (isSearching) {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.searchQuery.value = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear query")
-                            }
-                        }
-                    } else {
-                        IconButton(onClick = { viewModel.setSearching(true) }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search logs")
-                        }
-                        IconButton(
+                    IconButton(
                         onClick = {
                             if (!isDebugBuild) {
                                 val newState = !debugModeEnabled
@@ -424,6 +237,13 @@ fun DebugLogsScreen(
                                 else
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
+                            if (isDebugBuild) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                        .align(Alignment.TopEnd)
+                                )
                             }
                         }
                     }
@@ -438,12 +258,10 @@ fun DebugLogsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             LogsViewer(
-                logs = displayLogs,
-                searchQuery = searchQuery,
+                logs = logs,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
-                onHideCategory = { viewModel.toggleCategoryHidden(it) }
+                    .fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -463,7 +281,7 @@ fun DebugLogsScreen(
 
                 Button(
                     onClick = {
-                        viewModel.setLogs(emptyList())
+                        logs = emptyList()
                         Logger.clearLogs()
                     },
                     modifier = Modifier.weight(1f),
@@ -496,10 +314,8 @@ fun DebugLogsScreen(
 
 @Composable
 fun LogsViewer(
-    logs: List<DisplayLogEntry>,
-    searchQuery: String,
-    modifier: Modifier = Modifier,
-    onHideCategory: ((String) -> Unit)? = null
+    logs: List<LogEntry>,
+    modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
 
@@ -523,19 +339,10 @@ fun LogsViewer(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (searchQuery.isNotEmpty()) {
-                        Text(
-                            text = "No logs found for \"$searchQuery\"",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        Text(
-                            "No logs available",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
+                    Text(
+                        "No logs available",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
                 }
             } else {
                 LazyColumn(
@@ -544,10 +351,10 @@ fun LogsViewer(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     state = listState
                 ) {
-                    items(logs) { displayEntry ->
-                        LogEntryItem(displayEntry, onHideCategory)
+                    items(logs) { logEntry ->
+                        LogEntryItem(logEntry)
 
-                        if (displayEntry != logs.last()) {
+                        if (logEntry != logs.last()) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                                 modifier = Modifier.padding(vertical = 2.dp)
@@ -701,58 +508,6 @@ fun ReportIssueDialog(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun LogEntryItem(displayEntry: DisplayLogEntry, onHideCategory: ((String) -> Unit)?) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            if (displayEntry.entry.category != "unknown" && displayEntry.entry.category.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
-                            .clickable { onHideCategory?.invoke(displayEntry.entry.category) }
-                            .padding(start = 4.dp, top = 2.dp, bottom = 2.dp, end = 2.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = displayEntry.annotatedCategory,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Hide category",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    if (displayEntry.entry.timestamp != null) {
-                        Text(
-                            text = displayEntry.entry.timestamp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-            Text(
-                text = displayEntry.annotatedMessage,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-            )
         }
     }
 }

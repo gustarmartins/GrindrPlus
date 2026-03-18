@@ -351,24 +351,6 @@ class SettingsViewModel(
                 )
 
                 val managerSettings = mutableListOf<Setting>(
-                    TextSetting(
-                        id = "news_fetch_interval_hours",
-                        title = "News Fetch Interval (hours)",
-                        description = "How often to check for news in the background. Set to 0 to disable automatic fetching (manual only).",
-                        value = (Config.get("news_fetch_interval_hours", 6) as Number).toString(),
-                        onValueChange = {
-                            val value = it.toLongOrNull() ?: 6L
-                            viewModelScope.launch {
-                                Config.put("news_fetch_interval_hours", value)
-                                loadSettings()
-                            }
-                        },
-                        keyboardType = KeyboardType.Number,
-                        validator = { input ->
-                            val value = input.toLongOrNull()
-                            if (value == null || value < 0) "Must be 0 (manual only) or a positive number" else null
-                        }
-                    ),
                     TextSettingWithButtons(
                         id = "maps_api_key",
                         title = "Maps API Key",

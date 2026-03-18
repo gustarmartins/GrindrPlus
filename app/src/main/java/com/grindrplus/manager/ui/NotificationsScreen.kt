@@ -12,36 +12,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,34 +36,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.grindrplus.manager.fetchNotifs
-import com.grindrplus.manager.isNetworkAvailable
 import com.grindrplus.manager.tgMessages
 import dev.jeziellago.compose.markdowntext.MarkdownText
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationScreen(innerPadding: PaddingValues) {
     val messages by tgMessages.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var isRefreshing by remember { mutableStateOf(false) }
 
-    // Auto-fetch on first open if empty
     if (messages.isEmpty()) {
-        LaunchedEffect(Unit) {
-            isRefreshing = true
-            try {
-                fetchNotifs(context)
-            } finally {
-                isRefreshing = false
-            }
-        }
+        LaunchedEffect(Unit) { fetchNotifs(context) }
     }
 
     LaunchedEffect(messages.size) {
@@ -87,94 +58,63 @@ fun NotificationScreen(innerPadding: PaddingValues) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("News & Updates") }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { scaffoldPadding ->
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+    ) {
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(scaffoldPadding)
-                .padding(innerPadding)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-                            data = "https://t.me/grindrplusci".toUri()
-                        })
-                    },
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "News & Updates",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
-
-                    MarkdownText(
-                        markdown = "This is a mirror of our Telegram channel, click <b>here</b> to join.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 12.dp),
-                    )
-                }
-            }
-
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = {
-                    scope.launch {
-                        if (!isNetworkAvailable(context)) {
-                            snackbarHostState.showSnackbar("No internet connection")
-                            return@launch
-                        }
-                        isRefreshing = true
-                        try {
-                            fetchNotifs(context)
-                        } catch (e: Exception) {
-                            snackbarHostState.showSnackbar("Failed to refresh: ${e.message}")
-                        } finally {
-                            isRefreshing = false
-                        }
-                    }
+                .fillMaxWidth()
+                .padding(16.dp)
+                .clickable {
+                    context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                        data = "https://t.me/grindrplusci".toUri()
+                    })
                 },
-                modifier = Modifier.fillMaxSize()
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column {
+                Text(
+                    text = "News & Updates",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp),
+                    textAlign = TextAlign.Center
+                )
+
+                MarkdownText(
+                    markdown = "This is a mirror of our Telegram channel, click <b>here</b> to join.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 12.dp),
+                )
+            }
+        }
+
+        if (messages.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                if (messages.isEmpty() && !isRefreshing) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No messages yet. Pull down to refresh.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 16.dp)
-                    ) {
-                        items(messages) { message ->
-                            MessageBubble(message = message)
-                        }
-                    }
+                Text(
+                    text = "No messages yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                items(messages) { message ->
+                    MessageBubble(message = message)
                 }
             }
         }
@@ -223,4 +163,5 @@ fun MessageBubble(message: com.grindrplus.manager.GPlusMessage) {
             }
         }
     }
+
 }

@@ -1,6 +1,5 @@
 package com.grindrplus.hooks
 
-import android.util.Log
 import android.widget.Toast
 import androidx.room.withTransaction
 import com.grindrplus.GrindrPlus
@@ -30,6 +29,7 @@ import com.grindrplus.utils.RetrofitUtils.isSuccess
 import com.grindrplus.utils.hook
 import com.grindrplus.utils.hookConstructor
 import com.grindrplus.utils.withSuspendResult
+import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.getObjectField
 import de.robv.android.xposed.XposedHelpers.setObjectField
 import java.io.Closeable
@@ -57,7 +57,6 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
             albumsServiceClass,
         ) { originalHandler, proxy, method, args ->
             val result = originalHandler.invoke(proxy, method, args)
-
             try {
                 when {
                     method.isGET("v2/albums/{albumId}") -> handleGetAlbum(args, result)
@@ -88,6 +87,37 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
             }
         }
 
+        findClass(albumModel).hook("getAlbumViewable", HookStage.BEFORE) { param ->
+            param.setResult(true)
+        }
+
+        val albumBodyUiData = "com.grindrapp.android.chat.presentation.model.BodyUiData\$AlbumBodyUiData"
+        findClass(albumBodyUiData).hook("isViewable", HookStage.BEFORE) { param ->
+            param.setResult(true)
+        }
+
+        findClass("com.grindrapp.android.chat.ui.model.AlbumClickEvent").hook("isViewable", HookStage.BEFORE) { param ->
+            param.setResult(true)
+        }
+
+        val albumBodyModel = "com.grindrapp.android.chat.data.model.messagebody.AlbumBody"
+        findClass(albumBodyModel).hookConstructor(HookStage.AFTER) { param ->
+            try {
+                setObjectField(param.thisObject(), "isViewable", true)
+            } catch (e: Exception) {
+                loge("Error making AlbumBody viewable: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
+        findClass(albumBodyModel).hook("isViewable", HookStage.BEFORE) { param ->
+            param.setResult(true)
+        }
+
+        findClass(albumBodyModel).hook("getIsViewable", HookStage.BEFORE) { param ->
+            param.setResult(true)
+        }
+
         findClass(spankBankAlbumModel).hookConstructor(HookStage.AFTER) { param ->
             try {
                 setObjectField(param.thisObject(), "albumViewable", true)
@@ -109,12 +139,61 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
             }
         }
 
-        // pressie
         findClass("com.grindrapp.android.albums.data.model.Album").hookConstructor(HookStage.AFTER) { param ->
             try {
                 setObjectField(param.thisObject(), "albumViewable", true)
             } catch (e: Exception) {
                 loge("Error making fresh album viewable: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+        
+        // v3/pressie-albums/feed responds with server paywalls, but the client can be tricked
+        // and avoid it by constructing a fake spankbank model from `paywalledAlbums` URLs
+        val spankBankResponseModel = "com.grindrapp.android.albums.spankbank.domain.model.SpankBankAlbumForProfileResponse"
+        findClass(spankBankResponseModel).hookConstructor(HookStage.AFTER) { param ->
+            try {
+                val contentList = getObjectField(param.thisObject(), "content") as? List<*> ?: return@hookConstructor
+                val paywalledAlbums = getObjectField(param.thisObject(), "paywalledAlbums") as? Map<*, *>
+
+                if (contentList.isEmpty() && !paywalledAlbums.isNullOrEmpty()) {
+                    val albumContentClass = findClass(spankBankAlbumContentModel)
+                    val contentTypeClass = findClass("com.grindrapp.android.albums.spankbank.domain.model.SpankBankAlbumContentType")
+                    val imageType = de.robv.android.xposed.XposedHelpers.getStaticObjectField(contentTypeClass, "AlbumImage")
+                    val videoType = de.robv.android.xposed.XposedHelpers.getStaticObjectField(contentTypeClass, "AlbumMp4Video")
+
+                    val newContent = mutableListOf<Any>()
+
+                    paywalledAlbums.values.forEach { paywallContent ->
+                        if (paywallContent == null) return@forEach
+                        val albumId = callMethod(paywallContent, "getAlbumId") as Long
+                        val urls = callMethod(paywallContent, "getPaywallUrls") as List<*>
+
+                        urls.forEachIndexed { index, urlObj ->
+                            val url = urlObj?.toString() ?: return@forEachIndexed
+                            val type = if (url.contains(".mp4") || url.contains(".mov")) videoType else imageType
+                            
+                            // constructor: (long albumId, long contentId, ContentType, String url, boolean viewable, boolean seen, Long prev, Long next)
+                            val contentInst = albumContentClass.constructors.first().newInstance(
+                                albumId,
+                                (albumId + index + 1), // Fake unique content ID
+                                type,
+                                url,
+                                true, // albumViewable
+                                false, // seen
+                                null, // prev
+                                null  // next
+                            )
+                            newContent.add(contentInst)
+                        }
+                    }
+
+                    if (newContent.isNotEmpty()) {
+                        setObjectField(param.thisObject(), "content", newContent)
+                    }
+                }
+            } catch (e: Throwable) {
+                loge("Error fixing SpankBankAlbumForProfileResponse: ${e.message}")
                 Logger.writeRaw(e.stackTraceToString())
             }
         }
@@ -144,6 +223,31 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
                 setObjectField(param.thisObject(), "paywallStatus", unlockedStatus)
             } catch (e: Exception) {
                 loge("Error marking fresh data unlocked: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+        
+        // suppress client's paywall to allow navigation in the albums feed
+        val onFreshItemClicked = "com.grindrapp.android.albums.presentation.model.fresh.FreshCarouselEvent\$OnFreshItemClicked"
+        findClass(onFreshItemClicked).hookConstructor(HookStage.AFTER) { param ->
+            try {
+                setObjectField(param.thisObject(), "isLocked", false)
+            } catch (e: Throwable) {
+                loge("Error bypassing pressie lock: ${e.message}")
+                Logger.writeRaw(e.stackTraceToString())
+            }
+        }
+
+        // suppress "Unlock this album" banner in the client with an empty map
+        // needs checking; i believe it is stable and also makes the UI cleaner...
+        val fullScreenUiState = "com.grindrapp.android.albums.spankbank.domain.model.FullScreenUiState"
+        findClass(fullScreenUiState).hook("getContentToPaywall", HookStage.BEFORE) { param ->
+            try {
+                val extensionsClass = findClass("kotlinx.collections.immutable.ExtensionsKt")
+                val emptyMap = extensionsClass.getMethod("persistentMapOf").invoke(null)
+                param.setResult(emptyMap)
+            } catch (e: Throwable) {
+                loge("Error suppressing album paywall button: ${e.message}")
                 Logger.writeRaw(e.stackTraceToString())
             }
         }
@@ -403,7 +507,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
 
     @Suppress("UNCHECKED_CAST")
     private fun handleGetAlbums(args: Array<Any?>, result: Any) =
-        withSuspendResult(args, result) { args, result ->
+        withSuspendResult(args, result) { _, result ->
             if (result.isSuccess()) {
                 try {
                     val albums = getObjectField(result.getSuccessValue(), "albums") as? List<Any>
@@ -460,7 +564,7 @@ class UnlimitedAlbums : Hook("Unlimited albums", "Allow to be able to view unlim
 
     @Suppress("UNCHECKED_CAST")
     private fun handleGetAlbumsShares(args: Array<Any?>, result: Any) =
-        withSuspendResult(args, result) { args, result ->
+        withSuspendResult(args, result) { _, result ->
             logd("Fetching shared albums")
             if (result.isSuccess()) {
                 try {

@@ -57,8 +57,8 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
         if (args.isEmpty()) {
             val status = (Config.get("current_location", "") as String).isEmpty()
             if (!status) {
-                disableTeleport()
-                return
+                Config.put("current_location", "")
+                return GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
             }
 
             return GrindrPlus.showToast(Toast.LENGTH_LONG, "Please provide a location")
@@ -74,8 +74,8 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
          */
         when {
             args.size == 1 && args[0] == "off" -> {
-                disableTeleport()
-                return
+                Config.put("current_location", "")
+                return GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
             }
             args.size == 1 && args[0].contains(",") -> {
                 val (lat, lon) = args[0].split(",").map { it.toDouble() }
@@ -91,18 +91,17 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
                  * it could be either a saved location or an actual city.
                  */
                 coroutineScope.launch {
-                    val query = args.joinToString(" ")
-                    val location = getLocation(query)
+                    val location = getLocation(args.joinToString(" "))
                     if (location != null) {
-                        teleportToCoordinates(location.first, location.second, name = "saved location: $query")
+                        teleportToCoordinates(location.first, location.second)
                     } else {
                         /**
                          * No valid saved location was found, try to get the actual location
                          * using Android's native Geocoder.
                          */
-                        val apiLocation = getLocationFromGeocoder(query)
+                        val apiLocation = getLocationFromGeocoder(args.joinToString(" "))
                         if (apiLocation != null) {
-                            teleportToCoordinates(apiLocation.first, apiLocation.second, name = query)
+                            teleportToCoordinates(apiLocation.first, apiLocation.second)
                         } else {
                             GrindrPlus.showToast(Toast.LENGTH_LONG, "Location not found")
                         }
@@ -282,71 +281,19 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
         }
     }
 
-    private fun disableTeleport() {
-        Config.put("current_location", "")
-        Config.put("current_location_name", "")
-
-        val gpsCoords = getGpsLocation()
-        // Unsure if I need this
-        if (gpsCoords == null) {
-            GrindrPlus.showToast(Toast.LENGTH_LONG,
-                "Teleport disabled.")
-            return
-        }
-
-        val parts = gpsCoords.split(",")
-        val lat = parts[0].toDouble()
-        val lon = parts[1].toDouble()
-        val geohash = coordsToGeoHash(lat, lon)
-
-        GrindrPlus.executeAsync {
-            GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
-            try {
-                val success = GrindrPlus.httpClient.updateLocation(geohash)
-                if (success) {
-                    try {
-                        val refreshed = GrindrPlus.httpClient.refreshSessionViaIncognito()
-                        if (!refreshed) {
-                            Logger.w("Session refresh after disabling teleport failed.")
-                            GrindrPlus.showToast(Toast.LENGTH_LONG,
-                                "You might still be seen at your old location for a while.")
-                        }
-                    } catch (e: Exception) {
-                        Logger.w("Session refresh after disabling teleport failed: ${e.message}")
-                        GrindrPlus.showToast(Toast.LENGTH_LONG,
-                            "You might still be seen at your old location for a while.")
-                    }
-                } else {
-                    Logger.w("Location update failed after disabling teleport")
-                    GrindrPlus.showToast(Toast.LENGTH_LONG,
-                        "Others may take a moment to see you at your real location")
-                }
-            } catch (e: Exception) {
-                Logger.e("Error updating location after disabling teleport: ${e.message}")
-                GrindrPlus.showToast(Toast.LENGTH_LONG,
-                    "Others may take a moment to see you at your real location")
-            }
-        }
-    }
-    private fun teleportToCoordinates(lat: Double, lon: Double, name: String = "", silent: Boolean = false) {
+    private fun teleportToCoordinates(lat: Double, lon: Double, silent: Boolean = false) {
         Config.put("current_location", "$lat,$lon")
-        Config.put("current_location_name", name)
         val geohash = coordsToGeoHash(lat, lon)
-        val label = if (name.isNotEmpty()) "$name ($lat, $lon)" else "$lat, $lon"
 
         GrindrPlus.executeAsync {
-            if (!silent) {
-                GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $label")
-            }
             try {
                 GrindrPlus.httpClient.updateLocation(geohash)
-                GrindrPlus.httpClient.refreshSessionViaIncognito()
-                
-            // TODO: Move this as a toggable setting
-            // TODO: Warn user if Incognito fails    
             } catch (e: Exception) {
-                Logger.e("Error during teleport: ${e.message}")
+                Logger.e("Error sending geohash to API: ${e.message}")
             }
         }
+
+        if (!silent)
+            GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $lat, $lon")
     }
 }

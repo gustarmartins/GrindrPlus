@@ -122,7 +122,7 @@ object GrindrPlus {
     private var currentActivityRef: WeakReference<Activity>? = null
 
     private val splineDataEndpoint =
-        "https://raw.githubusercontent.com/R0rt1z2/GrindrPlus/refs/heads/master/spline.json"
+        "https://raw.githubusercontent.com/gustarmartins/GrindrPlus/refs/heads/master/spline.json"
 
     val serverNotifications = EventManager.serverNotifications
 

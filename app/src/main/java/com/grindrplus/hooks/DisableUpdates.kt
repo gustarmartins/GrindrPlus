@@ -9,16 +9,13 @@ import com.grindrplus.utils.HookStage
 import com.grindrplus.utils.hook
 import com.grindrplus.utils.hookConstructor
 import de.robv.android.xposed.XposedHelpers.setObjectField
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
+import com.grindrplus.core.Config
 
 class DisableUpdates : Hook(
     "Disable updates",
     "Disable forced updates"
 ) {
-    private val versionInfoEndpoint =
-        "https://raw.githubusercontent.com/R0rt1z2/GrindrPlus/master/version.json"
+
     private val appUpdateInfo = "com.google.android.play.core.appupdate.AppUpdateInfo"
     private val appUpdateZzm = "com.google.android.play.core.appupdate.zzm" // search for 'requestUpdateInfo(%s)'
 	private val appUpgradeManager = "rz.v" // search for 'Uri.parse("market://details?id=com.grindrapp.android");'
@@ -48,33 +45,18 @@ class DisableUpdates : Hook(
                 param.setResult(null)
             }
 
-        Thread {
-            fetchLatestVersionInfo()
-        }.start()
+        readConfigAndUpdate()
     }
 
-    private fun fetchLatestVersionInfo() {
-        val client = OkHttpClient()
-        val request = Request.Builder()
-            .url(versionInfoEndpoint).build()
+    private fun readConfigAndUpdate() {
+        val spoofedName = Config.get("spoofed_version_name", "26.5.0") as String
+        val spoofedCodeStr = Config.get("spoofed_version_code", "154546") as String
+        val spoofedCode = spoofedCodeStr.toIntOrNull() ?: 0
 
-        try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val jsonData = response.body?.string()
-                if (jsonData != null) {
-                    val json = JSONObject(jsonData)
-                    versionCode = json.getInt("versionCode")
-                    versionName = json.getString("versionName")
-                    logd("Successfully fetched version info: $versionName ($versionCode)")
-                    updateVersionInfo()
-                }
-            } else {
-                loge("Failed to fetch version info: ${response.message}")
-            }
-        } catch (e: Exception) {
-            loge("Error fetching version info: ${e.message}")
-            Logger.writeRaw(e.stackTraceToString())
+        if (spoofedName.isNotEmpty() && spoofedCode > 0) {
+            versionName = spoofedName
+            versionCode = spoofedCode
+            updateVersionInfo()
         }
     }
 

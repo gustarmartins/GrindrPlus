@@ -20,8 +20,8 @@ android {
         applicationId = "com.grindrplus"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "4.8.0.RC-${grindrVersionName.let { it.joinToString("_") }}_$gitCommitHash"
+        versionCode = 500
+        versionName = "5.0.0-${grindrVersionName.joinToString("_")}_$gitCommitHash"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -55,6 +55,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

@@ -75,14 +75,17 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
         when {
             args.size == 1 && args[0] == "off" -> {
                 Config.put("current_location", "")
+                Config.put("current_location_name", "")
                 return GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleportation disabled")
             }
             args.size == 1 && args[0].contains(",") -> {
                 val (lat, lon) = args[0].split(",").map { it.toDouble() }
+                Config.put("current_location_name", "")
                 teleportToCoordinates(lat, lon)
             }
             args.size == 2 && args.all { arg -> arg.toDoubleOrNull() != null } -> {
                 val (lat, lon) = args.map { it.toDouble() }
+                Config.put("current_location_name", "")
                 teleportToCoordinates(lat, lon)
             }
             else -> {
@@ -91,16 +94,19 @@ class Location(recipient: String, sender: String) : CommandModule("Location", re
                  * it could be either a saved location or an actual city.
                  */
                 coroutineScope.launch {
-                    val location = getLocation(args.joinToString(" "))
+                    val locationName = args.joinToString(" ")
+                    val location = getLocation(locationName)
                     if (location != null) {
+                        Config.put("current_location_name", locationName)
                         teleportToCoordinates(location.first, location.second)
                     } else {
                         /**
                          * No valid saved location was found, try to get the actual location
                          * using Android's native Geocoder.
                          */
-                        val apiLocation = getLocationFromGeocoder(args.joinToString(" "))
+                        val apiLocation = getLocationFromGeocoder(locationName)
                         if (apiLocation != null) {
+                            Config.put("current_location_name", locationName)
                             teleportToCoordinates(apiLocation.first, apiLocation.second)
                         } else {
                             GrindrPlus.showToast(Toast.LENGTH_LONG, "Location not found")

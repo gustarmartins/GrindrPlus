@@ -5,6 +5,7 @@ import com.grindrplus.core.Logger
 import com.grindrplus.hooks.AllowScreenshots
 import com.grindrplus.hooks.AntiBlock
 import com.grindrplus.hooks.AntiDetection
+import com.grindrplus.hooks.AssignmentsInterceptor
 import com.grindrplus.hooks.BanManagement
 import com.grindrplus.hooks.ChatIndicators
 import com.grindrplus.hooks.ChatTerminal
@@ -12,11 +13,12 @@ import com.grindrplus.hooks.DisableAnalytics
 import com.grindrplus.hooks.DisableBoosting
 import com.grindrplus.hooks.DisableShuffle
 import com.grindrplus.hooks.DisableUpdates
-import com.grindrplus.hooks.EmptyCalls
+// import com.grindrplus.hooks.EmptyCalls
 import com.grindrplus.hooks.EnableUnlimited
 import com.grindrplus.hooks.ExpiringMedia
 import com.grindrplus.hooks.FeatureGranting
-import com.grindrplus.hooks.LocalSavedPhrases
+import com.grindrplus.hooks.FlushSession
+// import com.grindrplus.hooks.LocalSavedPhrases
 import com.grindrplus.hooks.LocationSpoofer
 import com.grindrplus.hooks.NotificationAlerts
 import com.grindrplus.hooks.OnlineIndicator
@@ -42,6 +44,7 @@ class HookManager {
                 AllowScreenshots(),
                 AntiBlock(),
                 AntiDetection(),
+                AssignmentsInterceptor(),
                 BanManagement(),
                 ChatIndicators(),
                 ChatTerminal(),
@@ -49,11 +52,12 @@ class HookManager {
                 DisableBoosting(),
                 DisableShuffle(),
                 DisableUpdates(),
-                EmptyCalls(),
+                // EmptyCalls(),
                 EnableUnlimited(),
                 ExpiringMedia(),
                 FeatureGranting(),
-                LocalSavedPhrases(),
+                FlushSession(),
+                // LocalSavedPhrases(),
                 LocationSpoofer(),
                 NotificationAlerts(),
                 OnlineIndicator(),
@@ -70,7 +74,7 @@ class HookManager {
 
             hookList.forEach { hook ->
                 Config.initHookSettings(
-                    hook.hookName, hook.hookDesc, false
+                    hook.hookName, hook.hookDesc, true
                 )
             }
 

@@ -35,7 +35,7 @@ class FeatureGranting : Hook(
         findClass(isFeatureFlagEnabled).hook("a", HookStage.BEFORE) { param ->
             val flagKey = callMethod(param.args()[0], "toString") as String
             if (featureManager.isManaged(flagKey)) {
-                param.setResult(featureManager.isEnabled(flagKey))
+                param.setResult(featureManager.getForcedValue(flagKey))
             }
         }
 
@@ -99,39 +99,12 @@ class FeatureGranting : Hook(
     }
 
     private fun initFeatures() {
-        featureManager.add(Feature("PasswordComplexity", false))
-        featureManager.add(Feature("TimedBans", false))
-        featureManager.add(Feature("GenderFlag", true))
-        featureManager.add(Feature("ForceApplovinOptOut", true))
-        featureManager.add(Feature("RewardedAdViewedMeFeatureFlag", false))
-        featureManager.add(Feature("ChatInterstitialFeatureFlag", false))
-        featureManager.add(Feature("SideDrawerDeeplinkKillSwitch", true))
-        featureManager.add(Feature("SponsoredRoamKillSwitch", true))
-        featureManager.add(Feature("UnifiedProfileAvatarFeatureFlag", true))
-        featureManager.add(Feature("ApproximateDistanceFeatureFlag", false))
-        featureManager.add(Feature("DoxyPEP", true))
-        featureManager.add(Feature("CascadeRewriteFeatureFlag", false))
-        featureManager.add(Feature("AdsLogs", false))
-        featureManager.add(Feature("NonChatEnvironmentAdBannerFeatureFlag", false))
-        featureManager.add(Feature("PersistentAdBannerFeatureFlag", false))
-        featureManager.add(Feature("ClientTelemetryTracking", false))
-        featureManager.add(Feature("LTOAds", false))
-        featureManager.add(Feature("SponsorProfileAds", false))
-        featureManager.add(Feature("ConversationAds", false))
-        featureManager.add(Feature("InboxNativeAds", false))
-        featureManager.add(Feature("ReportingLagTime", false))
-        featureManager.add(Feature("MrecNewFlow", false))
-        featureManager.add(Feature("RunningOnEmulatorFeatureFlag", false))
-        featureManager.add(Feature("BannerNewFlow", false))
-        featureManager.add(Feature("CalendarUi", true))
+        featureManager.loadFromDefinitions()
         featureManager.add(Feature("CookieTap", Config.get("enable_cookie_tap", false, true) as Boolean))
         featureManager.add(Feature("VipFlag", Config.get("enable_vip_flag", false, true) as Boolean))
-        featureManager.add(Feature("PositionFilter", true))
-        featureManager.add(Feature("AgeFilter", true))
-        featureManager.add(Feature("BanterFeatureGate", false))
-        featureManager.add(Feature("TakenOnGrindrWatermarkFlag", false))
-        featureManager.add(Feature("gender-filter", true))
-        featureManager.add(Feature("enable-chat-summaries", true))
         featureManager.add(Feature("enable-mutual-taps-no-paywall", !(Config.get("enable_interest_section", true, true) as Boolean)))
+        featureManager.add(Feature("home-navigation-v2", Config.get("home_navigation_v2", false, true) as Boolean))
+        featureManager.add(Feature("discover-v2", Config.get("discover_v2", false, true) as Boolean))
+        featureManager.add(Feature("side-profile-link", Config.get("side_profile_link", false, true) as Boolean))
     }
 }

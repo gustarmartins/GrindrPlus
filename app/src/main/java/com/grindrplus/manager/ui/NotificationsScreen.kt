@@ -66,12 +66,7 @@ fun NotificationScreen(innerPadding: PaddingValues) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
-                .clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-                        data = "https://t.me/grindrplusci".toUri()
-                    })
-                },
+                .padding(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column {
@@ -84,7 +79,7 @@ fun NotificationScreen(innerPadding: PaddingValues) {
                 )
 
                 MarkdownText(
-                    markdown = "This is a mirror of our Telegram channel, click <b>here</b> to join.",
+                    markdown = "Stay up to date with the latest GrindrPlus news and releases.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .padding(horizontal = 16.dp)

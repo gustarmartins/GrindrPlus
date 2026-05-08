@@ -52,11 +52,7 @@ class AlwaysOnline :
             if (grindrLocationProviderInstance == null) {
                 lastRunTime = System.currentTimeMillis()
                 lastRunSuccess = false
-<<<<<<< HEAD
-                lastError = "Failed to get the location provider instance. (app may be in background)"
-=======
                 lastError = "Location provider not initialized yet."
->>>>>>> experimental/master-v26
                 logw("Run #$runNumber skipped: $lastError")
                 return false
             }

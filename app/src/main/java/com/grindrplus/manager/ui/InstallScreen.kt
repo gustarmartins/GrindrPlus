@@ -250,6 +250,15 @@ fun InstallPage(context: Activity, innerPadding: PaddingValues, viewModel: Insta
                 )
             }
 
+            MessageBanner(
+                text = "Auto-download for Grindr is no longer supported. Please download the Grindr base APK manually from APKMirror, then select 'Use Custom Files...' below to install.",
+                isVisible = true,
+                isPulsating = false,
+                modifier = Modifier.fillMaxWidth(),
+                type = BannerType.INFO,
+                onDismiss = null
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically

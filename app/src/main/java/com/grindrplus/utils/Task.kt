@@ -3,7 +3,10 @@ package com.grindrplus.utils
 import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
 import com.grindrplus.core.Logger
-import com.grindrplus.core.LogSource
+import com.grindrplus.core.logd
+import com.grindrplus.core.loge
+import com.grindrplus.core.logi
+import com.grindrplus.core.logw
 import kotlinx.coroutines.Job
 
 abstract class Task(
@@ -13,6 +16,9 @@ abstract class Task(
     val intervalMillis: Long = 10 * 60 * 1000 // 10 minutes
 ) {
     private var job: Job? = null
+
+    open var lastError: String? = null
+        protected set
 
     /**
      * Check if the task is enabled in config
@@ -32,7 +38,7 @@ abstract class Task(
      */
     fun start() {
         if (!isTaskEnabled()) {
-            Logger.i("Task $id is disabled", LogSource.MODULE)
+            logi("Task $id is disabled")
             return
         }
 
@@ -41,21 +47,34 @@ abstract class Task(
             initialDelayMillis = initialDelayMillis,
             intervalMillis = intervalMillis,
             action = {
+                val startTime = System.currentTimeMillis()
                 try {
                     val success = execute()
+                    val durationMs = System.currentTimeMillis() - startTime
+                    try {
+                        GrindrPlus.bridgeClient.logTaskRun(
+                            id, success,
+                            if (!success) (lastError ?: "Task returned false") else null,
+                            durationMs
+                        )
+                    } catch (_: Exception) {}
                     if (success) {
-                        Logger.i("Task $id executed successfully", LogSource.MODULE)
+                        logd("Task $id executed successfully")
                     } else {
-                        Logger.w("Task $id did not complete successfully", LogSource.MODULE)
+                        logw("Task $id run was unsuccessful")
                     }
                 } catch (e: Exception) {
-                    Logger.e("Task $id failed: ${e.message}", LogSource.MODULE)
+                    val durationMs = System.currentTimeMillis() - startTime
+                    try {
+                        GrindrPlus.bridgeClient.logTaskRun(id, false, e.message, durationMs)
+                    } catch (_: Exception) {}
+                    loge("Task $id failed: ${e.message}")
                     Logger.writeRaw(e.stackTraceToString())
                 }
             }
         )
 
-        Logger.i("Task $id started", LogSource.MODULE)
+        logi("Task $id started")
     }
 
     /**
@@ -65,7 +84,7 @@ abstract class Task(
         job?.let {
             if (GrindrPlus.taskManager.isTaskRunning(id)) {
                 GrindrPlus.taskManager.cancelTask(id)
-                Logger.i("Task $id stopped", LogSource.MODULE)
+                logi("Task $id stopped")
             }
         }
         job = null
@@ -78,7 +97,7 @@ abstract class Task(
         Config.initTaskSettings(
             id,
             description,
-            false // disabled by default
+            true // enabled by default
         )
     }
 }

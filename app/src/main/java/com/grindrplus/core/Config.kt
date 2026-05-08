@@ -7,7 +7,9 @@ import org.json.JSONObject
 import java.io.IOException
 
 object Config {
-    private var localConfig = JSONObject()
+    private var localConfig: JSONObject = JSONObject()
+    var isConfigLoaded: Boolean = false
+        private set
     private var currentPackageName = Constants.GRINDR_PACKAGE_NAME
     private val GLOBAL_SETTINGS = listOf("first_launch", "analytics", "discreet_icon", "material_you", "debug_mode", "disable_permission_checks", "custom_manifest", "maps_api_key")
 
@@ -16,7 +18,14 @@ object Config {
             Logger.d("Initializing config for package: $packageName", LogSource.MANAGER)
         }
 
-        localConfig = readRemoteConfig()
+        val remoteConfig = readRemoteConfig()
+        if (remoteConfig != null) {
+            localConfig = remoteConfig
+            isConfigLoaded = true
+        } else {
+            Logger.w("Config failed to load. Falling back to defaults and blocking saves for this session.", LogSource.MANAGER)
+            isConfigLoaded = false
+        }
 
         if (packageName != null) {
             currentPackageName = packageName
@@ -57,13 +66,17 @@ object Config {
             writeRemoteConfig(localConfig)
         }
 
-        ensurePackageExists(currentPackageName)
+        if (isConfigLoaded) {
+            ensurePackageExists(currentPackageName)
+        }
     }
 
     fun setCurrentPackage(packageName: String) {
         Logger.d("Setting current package to $packageName", LogSource.MANAGER)
         currentPackageName = packageName
-        ensurePackageExists(packageName)
+        if (isConfigLoaded) {
+            ensurePackageExists(packageName)
+        }
     }
 
     fun getCurrentPackage(): String {
@@ -92,20 +105,21 @@ object Config {
         }
     }
 
-    fun readRemoteConfig(): JSONObject {
+    fun readRemoteConfig(): JSONObject? {
         return try {
             GrindrPlus.bridgeClient.getConfig()
         } catch (e: Exception) {
             Logger.e("Failed to read config file: ${e.message}", LogSource.MANAGER)
             Logger.writeRaw(e.stackTraceToString())
-            JSONObject().put("clones", JSONObject().put(
-                Constants.GRINDR_PACKAGE_NAME,
-                JSONObject().put("hooks", JSONObject()))
-            )
+            null
         }
     }
 
     fun writeRemoteConfig(json: JSONObject) {
+        if (!isConfigLoaded) {
+            Logger.w("Refusing to write config because it failed to load initially", LogSource.MANAGER)
+            return
+        }
         try {
             GrindrPlus.bridgeClient.setConfig(json)
         } catch (e: IOException) {
@@ -114,7 +128,7 @@ object Config {
         }
     }
 
-    private fun getCurrentPackageConfig(): JSONObject {
+    fun getCurrentPackageConfig(): JSONObject {
         val clones = localConfig.optJSONObject("clones")
             ?: JSONObject().also { localConfig.put("clones", it) }
 

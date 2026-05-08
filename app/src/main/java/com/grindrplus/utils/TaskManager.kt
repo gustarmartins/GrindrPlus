@@ -1,5 +1,6 @@
 package com.grindrplus.utils
 
+import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
 import com.grindrplus.core.LogSource
 import com.grindrplus.core.Logger
@@ -106,6 +107,40 @@ class TaskManager(private val scheduler: TaskScheduler? = null) {
     ): Job {
         val scheduler = scheduler ?: error("TaskScheduler is not initialized")
         return scheduler.withRetry(taskId, retries, delayMs, action)
+    }
+
+    fun triggerTask(taskId: String) {
+        val task = tasks.values.find { it.id == taskId } ?: return
+        GrindrPlus.executeAsync {
+            val startTime = System.currentTimeMillis()
+            try {
+                Logger.i("Manually triggering task: ${task.id}", LogSource.MODULE)
+                val success = task.execute()
+                val durationMs = System.currentTimeMillis() - startTime
+                try {
+                    GrindrPlus.bridgeClient.logTaskRun(
+                        task.id, success,
+                        if (!success) (task.lastError ?: "Task returned false") else null,
+                        durationMs
+                    )
+                } catch (_: Exception) {}
+                if (success) {
+                    Logger.s("Manual run of task ${task.id} succeeded", LogSource.MODULE)
+                    GrindrPlus.showToast(android.widget.Toast.LENGTH_SHORT, "Task ${task.id} succeeded")
+                } else {
+                    Logger.w("Manual run of task ${task.id} failed", LogSource.MODULE)
+                    GrindrPlus.showToast(android.widget.Toast.LENGTH_LONG, "Task ${task.id} failed. Check logs.")
+                }
+            } catch (e: Exception) {
+                val durationMs = System.currentTimeMillis() - startTime
+                try {
+                    GrindrPlus.bridgeClient.logTaskRun(task.id, false, e.message, durationMs)
+                } catch (_: Exception) {}
+                Logger.e("Manual run of task ${task.id} failed with error: ${e.message}", LogSource.MODULE)
+                Logger.writeRaw(e.stackTraceToString())
+                GrindrPlus.showToast(android.widget.Toast.LENGTH_LONG, "Task ${task.id} failed: ${e.message}")
+            }
+        }
     }
 
     fun isTaskRunning(taskId: String): Boolean {

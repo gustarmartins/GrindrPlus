@@ -51,16 +51,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.grindrplus.core.Config
 import com.grindrplus.manager.settings.ApiKeyTestDialog
 import com.grindrplus.manager.settings.ButtonSetting
@@ -71,6 +76,8 @@ import com.grindrplus.manager.settings.SettingsViewModel
 import com.grindrplus.manager.settings.SwitchSetting
 import com.grindrplus.manager.settings.TextSetting
 import com.grindrplus.manager.settings.TextSettingWithButtons
+import com.grindrplus.manager.settings.TriStateSetting
+import com.grindrplus.manager.settings.FeatureState
 import com.grindrplus.manager.settings.rememberViewModel
 import com.grindrplus.manager.ui.components.PackageSelector
 import com.grindrplus.manager.utils.FileOperationHandler
@@ -96,6 +103,19 @@ fun SettingsScreen(
     val apiKeyTestMessage by viewModel.apiKeyTestMessage.collectAsState()
     val apiKeyTestRawResponse by viewModel.apiKeyTestRawResponse.collectAsState()
     val apiKeyTestLoading by viewModel.apiKeyTestLoading.collectAsState()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadSettings()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     if (debugLogsScreen) {
         DebugLogsScreen(
@@ -179,7 +199,7 @@ fun SettingsScreen(
 
                                         FileOperationHandler.exportFile(
                                             "grindrplus_settings.json",
-                                            result.toString(4)
+                                            result?.toString(4) ?: ""
                                         )
 
                                         snackbarHostState.showSnackbar("Settings exported successfully")
@@ -480,33 +500,97 @@ fun AboutDialog(
 fun SettingGroupSection(
     group: SettingGroup,
     onSettingChanged: () -> Unit,
+    isSubGroup: Boolean = false,
 ) {
+    var isCollapsed by remember(group.id) { mutableStateOf(group.defaultCollapsed) }
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = if (isSubGroup) 16.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = group.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 1.dp
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .clickable(enabled = group.collapsable) { if (group.collapsable) isCollapsed = !isCollapsed }
+                .padding(bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                group.settings.forEachIndexed { index, setting ->
-                    ImprovedSettingItem(setting, onSettingChanged)
+            Text(
+                text = group.title,
+                style = if (isSubGroup) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
 
-                    if (index < group.settings.size - 1) {
+            if (group.collapsable) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = if (isCollapsed) "Expand" else "Collapse",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .rotate(if (isCollapsed) 0f else 90f)
+                )
+            }
+        }
+
+        AnimatedVisibility(visible = !isCollapsed || !group.collapsable) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (isSubGroup) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainer,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = if (isSubGroup) 0.dp else 1.dp
+            ) {
+                Column {
+                    group.headerSetting?.let { setting ->
+                        ImprovedSettingItem(setting, onSettingChanged)
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
+                    }
+
+                    Column(
+                        modifier = if (group.isDisabled) Modifier.alpha(0.5f) else Modifier
+                    ) {
+                        if (group.isDisabled) {
+                            Text(
+                                text = "Enable Feature Granting to apply these flags. Changes will be saved for now, anyways.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+
+                        if (group.subGroups.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                group.subGroups.forEach { subGroup ->
+                                    SettingGroupSection(
+                                        group = subGroup,
+                                        onSettingChanged = onSettingChanged,
+                                        isSubGroup = true
+                                    )
+                                }
+                            }
+                        }
+
+                        group.settings.forEachIndexed { index, setting ->
+                            ImprovedSettingItem(setting, onSettingChanged)
+
+                            if (index < group.settings.size - 1) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -521,6 +605,7 @@ fun ImprovedSettingItem(
 ) {
     when (setting) {
         is SwitchSetting -> ImprovedSwitchSetting(setting) { onSettingChanged() }
+        is TriStateSetting -> TriStateSettingComposable(setting) { onSettingChanged() }
         is TextSetting -> ImprovedTextSetting(setting) { onSettingChanged() }
         is TextSettingWithButtons -> ImprovedTextSettingWithButtons(setting) { onSettingChanged() }
         is ButtonSetting -> ImprovedButtonSetting(setting)
@@ -532,6 +617,8 @@ fun ImprovedSwitchSetting(
     setting: SwitchSetting,
     onChanged: () -> Unit,
 ) {
+    var localChecked by remember(setting.isChecked) { mutableStateOf(setting.isChecked) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -559,8 +646,10 @@ fun ImprovedSwitchSetting(
         Spacer(modifier = Modifier.width(16.dp))
 
         Switch(
-            checked = setting.isChecked,
+            checked = localChecked,
             onCheckedChange = {
+                localChecked = it
+                setting.isChecked = it
                 setting.onCheckedChange(it)
                 onChanged()
             },
@@ -576,6 +665,88 @@ fun ImprovedSwitchSetting(
     }
 }
 
+@Composable
+fun TriStateSettingComposable(
+    setting: TriStateSetting,
+    onChanged: () -> Unit,
+) {
+    var localState by remember(setting.state) { mutableStateOf(setting.state) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+
+        Text(
+            text = setting.title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        setting.description?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // OFF disables that | Default just won't mess with it | ON enables that
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            FeatureState.values().forEach { state ->
+                val isSelected = localState == state
+                val label = when (state) {
+                    FeatureState.ON -> "ON"
+                    FeatureState.OFF -> "OFF"
+                    FeatureState.DEFAULT -> "Default"
+                }
+                val selectedContainer = when (state) {
+                    FeatureState.ON -> MaterialTheme.colorScheme.primary
+                    FeatureState.OFF -> MaterialTheme.colorScheme.error
+                    FeatureState.DEFAULT -> MaterialTheme.colorScheme.secondaryContainer
+                }
+                val selectedContent = when (state) {
+                    FeatureState.ON -> MaterialTheme.colorScheme.onPrimary
+                    FeatureState.OFF -> MaterialTheme.colorScheme.onError
+                    FeatureState.DEFAULT -> MaterialTheme.colorScheme.onSecondaryContainer
+                }
+
+                Button(
+                    onClick = {
+                        localState = state
+                        setting.state = state
+                        setting.onStateChange(state)
+                        onChanged()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) selectedContainer
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (isSelected) selectedContent
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImprovedTextSetting(
@@ -583,7 +754,7 @@ fun ImprovedTextSetting(
     onChanged: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf(setting.value) }
+    var text by remember(setting.value) { mutableStateOf(setting.value) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -682,6 +853,7 @@ fun ImprovedTextSetting(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (errorMessage == null) {
+                                setting.value = text
                                 setting.onValueChange(text)
                                 isExpanded = false
                                 onChanged()
@@ -700,7 +872,8 @@ fun ImprovedTextSetting(
                         IconButton(
                             onClick = {
                                 if (errorMessage == null) {
-                                    setting.onValueChange(text)
+                                    setting.value = text
+                                setting.onValueChange(text)
                                     isExpanded = false
                                     onChanged()
                                 }
@@ -741,6 +914,7 @@ fun ImprovedTextSetting(
                     Button(
                         onClick = {
                             if (errorMessage == null) {
+                                setting.value = text
                                 setting.onValueChange(text)
                                 isExpanded = false
                                 onChanged()
@@ -769,7 +943,7 @@ fun ImprovedTextSettingWithButtons(
     onChanged: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf(setting.value) }
+    var text by remember(setting.value) { mutableStateOf(setting.value) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -868,6 +1042,7 @@ fun ImprovedTextSettingWithButtons(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (errorMessage == null) {
+                                setting.value = text
                                 setting.onValueChange(text)
                                 isExpanded = false
                                 onChanged()
@@ -886,7 +1061,8 @@ fun ImprovedTextSettingWithButtons(
                         IconButton(
                             onClick = {
                                 if (errorMessage == null) {
-                                    setting.onValueChange(text)
+                                    setting.value = text
+                                setting.onValueChange(text)
                                     isExpanded = false
                                     onChanged()
                                 }
@@ -916,8 +1092,10 @@ fun ImprovedTextSettingWithButtons(
                             setting.buttons.forEach { buttonAction ->
                                 Button(
                                     onClick = {
-                                        buttonAction.action()
-                                        text = setting.value
+                                        val result = buttonAction.action()
+                                        if (result != null) {
+                                            text = result
+                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -950,7 +1128,8 @@ fun ImprovedTextSettingWithButtons(
                         Button(
                             onClick = {
                                 if (errorMessage == null) {
-                                    setting.onValueChange(text)
+                                    setting.value = text
+                                setting.onValueChange(text)
                                     isExpanded = false
                                     onChanged()
                                 }

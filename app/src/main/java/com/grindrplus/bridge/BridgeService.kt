@@ -14,6 +14,7 @@ import android.os.Process
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import com.grindrplus.core.Config
 import com.grindrplus.core.LogSource
 import com.grindrplus.core.Logger
 import com.grindrplus.manager.fetchNotifs
@@ -35,6 +36,8 @@ class BridgeService : Service() {
     private val logFile by lazy { File(getExternalFilesDir(null), "grindrplus.log") }
     private val blockEventsFile by lazy { File(getExternalFilesDir(null), "block_events.json") }
     private val blockEventsLock = ReentrantLock()
+    private val taskRunsFile by lazy { File(getExternalFilesDir(null), "task_runs.json") }
+    private val taskRunsLock = ReentrantLock()
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val logLock = ReentrantLock()
     private val MAX_LOG_SIZE = 5 * 1024 * 1024
@@ -85,10 +88,26 @@ class BridgeService : Service() {
 
             try {
                 periodicTasksExecutor.scheduleWithFixedDelay(
-                    { runBlocking { fetchNotifs(this@BridgeService) } },
+                    {
+                        try {
+                            val intervalHours = (Config.get("news_fetch_interval_hours", 6) as Number).toLong()
+                            // 0 = user disabled automatic fetching entirely.
+                            if (intervalHours <= 0) return@scheduleWithFixedDelay
+
+                            val lastFetchMs = (Config.get("last_news_fetch_ms", 0L) as Number).toLong()
+                            val intervalMs = intervalHours * 60L * 60L * 1000L
+                            val elapsedMs = System.currentTimeMillis() - lastFetchMs
+
+                            if (elapsedMs >= intervalMs) {
+                                runBlocking { fetchNotifs(this@BridgeService) }
+                            }
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).e(e, "Error in periodic news fetch check")
+                        }
+                    },
                     0,
                     15,
-                    java.util.concurrent.TimeUnit.SECONDS
+                    java.util.concurrent.TimeUnit.MINUTES
                 )
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to schedule periodic tasks")
@@ -137,6 +156,11 @@ class BridgeService : Service() {
                 if (!blockEventsFile.exists()) {
                     blockEventsFile.createNewFile()
                     blockEventsFile.writeText("[]")
+                }
+
+                if (!taskRunsFile.exists()) {
+                    taskRunsFile.createNewFile()
+                    taskRunsFile.writeText("[]")
                 }
             } catch (e: Exception) {
                 Logger.e("Failed to initialize files: ${e.message}", LogSource.BRIDGE)
@@ -384,12 +408,68 @@ class BridgeService : Service() {
             }
         }
 
-        override fun isRooted(): Boolean {
-            return com.grindrplus.manager.utils.isRooted(applicationContext)
-        }
-
         override fun isLSPosed(): Boolean {
             return com.grindrplus.manager.utils.isLSPosed()
+        }
+
+        override fun logTaskRun(taskId: String, success: Boolean, error: String?, durationMs: Long) {
+            ioExecutor.execute {
+                try {
+                    taskRunsLock.withLock {
+                        if (!taskRunsFile.exists()) {
+                            taskRunsFile.createNewFile()
+                            taskRunsFile.writeText("[]")
+                        }
+
+                        val runsArray = JSONArray(taskRunsFile.readText().ifBlank { "[]" })
+                        val run = JSONObject().apply {
+                            put("taskId", taskId)
+                            put("success", success)
+                            put("error", error ?: JSONObject.NULL)
+                            put("timestamp", System.currentTimeMillis())
+                            put("durationMs", durationMs)
+                        }
+                        runsArray.put(run)
+                        taskRunsFile.writeText(runsArray.toString(4))
+                        Logger.d(
+                            "Logged task run for $taskId: ${if (success) "success" else "failure"}",
+                            LogSource.BRIDGE
+                        )
+                    }
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "Error logging task run")
+                }
+            }
+        }
+
+        override fun getTaskRuns(): String {
+            return try {
+                if (!taskRunsFile.exists()) {
+                    taskRunsFile.createNewFile()
+                    "[]"
+                } else {
+                    taskRunsFile.readText().ifBlank { "[]" }
+                }
+            } catch (e: Exception) {
+                Logger.e("Error reading task runs file", LogSource.BRIDGE)
+                Logger.writeRaw(e.stackTraceToString())
+                "[]"
+            }
+        }
+
+        override fun clearTaskRuns() {
+            taskRunsLock.withLock {
+                try {
+                    if (taskRunsFile.exists()) {
+                        taskRunsFile.delete()
+                        taskRunsFile.createNewFile()
+                        taskRunsFile.writeText("[]")
+                    }
+                } catch (e: Exception) {
+                    Logger.e("Error clearing task runs file", LogSource.BRIDGE)
+                    Logger.writeRaw(e.stackTraceToString())
+                }
+            }
         }
     }
 

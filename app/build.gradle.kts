@@ -13,15 +13,15 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        val grindrVersionName = listOf("25.20.0")
-        val grindrVersionCode = listOf(147239)
+        val grindrVersionName = listOf("26.0.1")
+        val grindrVersionCode = listOf(149389)
         val gitCommitHash = getGitCommitHash() ?: "unknown"
 
         applicationId = "com.grindrplus"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "4.7.4-${grindrVersionName.let { it.joinToString("_") }}_$gitCommitHash"
+        versionCode = 500
+        versionName = "5.0.0-${grindrVersionName.joinToString("_")}_$gitCommitHash"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -55,6 +55,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -116,7 +117,6 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.fetch2)
     implementation(libs.fetch2okhttp)
-    implementation(libs.rootbeer.lib)
     implementation(libs.zip.android) {
         artifact {
             type = "aar"

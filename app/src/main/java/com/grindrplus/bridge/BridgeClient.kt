@@ -367,21 +367,21 @@ class BridgeClient(private val context: Context) {
         }
     }
 
-    fun getConfig(): JSONObject {
+    fun getConfig(): JSONObject? {
         if (!isBound.get()) {
             if (connectBlocking(3000)) {
                 Logger.d("Connected to service on-demand for getConfig", LogSource.BRIDGE)
             } else {
                 Logger.w("Cannot get config, service not bound", LogSource.BRIDGE)
-                return JSONObject()
+                return null
             }
         }
 
         return try {
-            bridgeService?.config?.let { JSONObject(it) } ?: JSONObject()
+            bridgeService?.config?.let { JSONObject(it) }
         } catch (e: Exception) {
             Logger.e("Error getting config: ${e.message}", LogSource.BRIDGE)
-            JSONObject()
+            null
         }
     }
 
@@ -581,24 +581,6 @@ class BridgeClient(private val context: Context) {
         }
     }
 
-    fun isRooted(): Boolean {
-        if (!isBound.get()) {
-            if (connectBlocking(3000)) {
-                Logger.d("Connected to service on-demand for isRooted", LogSource.BRIDGE)
-            } else {
-                Logger.w("Cannot check root status, service not bound", LogSource.BRIDGE)
-                return false
-            }
-        }
-
-        return try {
-            bridgeService?.isRooted() ?: false
-        } catch (e: Exception) {
-            Logger.e("Error checking root status: ${e.message}", LogSource.BRIDGE)
-            false
-        }
-    }
-
     fun isLSPosed(): Boolean {
         if (!isBound.get()) {
             if (connectBlocking(3000)) {
@@ -614,6 +596,58 @@ class BridgeClient(private val context: Context) {
         } catch (e: Exception) {
             Logger.e("Error checking LSPosed status: ${e.message}", LogSource.BRIDGE)
             false
+        }
+    }
+
+    fun logTaskRun(taskId: String, success: Boolean, error: String?, durationMs: Long) {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for logTaskRun", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot log task run, service not bound", LogSource.BRIDGE)
+                return
+            }
+        }
+
+        try {
+            bridgeService?.logTaskRun(taskId, success, error, durationMs)
+        } catch (e: Exception) {
+            Logger.e("Error logging task run: ${e.message}", LogSource.BRIDGE)
+        }
+    }
+
+    fun getTaskRuns(): JSONArray {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for getTaskRuns", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot get task runs, service not bound", LogSource.BRIDGE)
+                return JSONArray()
+            }
+        }
+
+        return try {
+            bridgeService?.taskRuns?.let { JSONArray(it) } ?: JSONArray()
+        } catch (e: Exception) {
+            Logger.e("Error getting task runs: ${e.message}", LogSource.BRIDGE)
+            JSONArray()
+        }
+    }
+
+    fun clearTaskRuns() {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for clearTaskRuns", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot clear task runs, service not bound", LogSource.BRIDGE)
+                return
+            }
+        }
+
+        try {
+            bridgeService?.clearTaskRuns()
+        } catch (e: Exception) {
+            Logger.e("Error clearing task runs: ${e.message}", LogSource.BRIDGE)
         }
     }
 }

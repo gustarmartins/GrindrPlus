@@ -17,7 +17,6 @@ import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.getObjectField
 import de.robv.android.xposed.XposedHelpers.setObjectField
 
-// supported version: 25.20.0
 class EnableUnlimited : Hook(
     "Enable unlimited",
     "Enable Grindr Unlimited features"
@@ -26,10 +25,10 @@ class EnableUnlimited : Hook(
     private val profileModel = "com.grindrapp.android.persistence.model.Profile"
     private val tabLayoutClass = "com.google.android.material.tabs.TabLayout"
 
-    private val paywallUtils = "dk.c" // search for 'app_restart_required'
-    private val persistentAdBannerContainer = "Z4.a" // search for 'GrindrAdContainer grindrAdContainer = (GrindrAdContainer) ViewBindings.findChildViewById(view, R.id.persistent_banner_ad_compose_view);'
+    private val paywallUtils = "x90.e" // search for 'app_restart_required'
+    private val persistentAdBannerContainer = "nb.d" // search for '(ComposeView) ViewBindings.findChildViewById(view,'
     private val subscribeToInterstitialsList = listOf(
-        "fa.A\$a" // search for 'com.grindrapp.android.chat.presentation.ui.ChatActivityV2$subscribeToInterstitialAds$1$1$1'
+        "mo.b1\$a" // search for 'com.grindrapp.android.chat.presentation.ui.ChatActivityV2$subscribeToInterstitialAds$1$1$1'
     )
     private val viewsToHide = mapOf(
         "com.grindrapp.android.ui.tagsearch.ProfileTagCascadeFragment\$b" to listOf("upsell_bottom_bar"), // search for 'bind(Landroid/view/View;)Lcom/grindrapp/android/databinding/ProfileTagCascadeFragmentBinding;'
@@ -64,7 +63,7 @@ class EnableUnlimited : Hook(
 		// prevent leak of faked roles into http headers
 		// search for one line method returning an string in userSession
 		userSessionClass.hook( // get roles list as string
-			"F", HookStage.BEFORE
+			"D", HookStage.BEFORE
 		) { param ->
 			param.setResult("[]")
 		}
@@ -127,24 +126,72 @@ class EnableUnlimited : Hook(
             }
         }
 
+        // startGlobalChatStore (method d) triggers when chat features hit a paywall
         findClass(paywallUtils).hook("d", HookStage.BEFORE) { param ->
+            val args = param.args()
+            val upsellType = args.getOrNull(2)?.toString() ?: "unknown"
+            val startType = args.getOrNull(1)?.toString() ?: "unknown"
             val stackTrace = Thread.currentThread().stackTrace.dropWhile {
                 !it.toString().contains("LSPHooker") }.drop(1).joinToString("\n")
+            val fullTrace = "=== PAYWALL: startGlobalChatStore (method d) ===\n" +
+                    "UpsellType: $upsellType\n" +
+                    "StartType: $startType\n" +
+                    "Args: ${args.mapIndexed { i, a -> "[$i] ${a?.javaClass?.name}: $a" }.joinToString("\n")}\n" +
+                    "---\n$stackTrace"
+
+            logi("Paywall intercepted (startGlobalChatStore): upsellType=$upsellType, startType=$startType")
+            Logger.writeRaw(fullTrace)
 
             android.app.AlertDialog.Builder(GrindrPlus.currentActivity)
-                .setTitle("Paywalled Feature Detected")
+                .setTitle("Paywalled Feature Detected (Chat)")
                 .setMessage(
-                    "This feature is server-enforced and cannot be bypassed in this version.\n\n" +
-                            "If you think this is a mistake, please report it to the developer. " +
+                    "Method: startGlobalChatStore\n" +
+                            "UpsellType: $upsellType\n" +
+                            "StartType: $startType\n\n" +
+                            "This feature is server-enforced and cannot be bypassed in this version.\n\n" +
+                            "Copy the stack trace for debugging."
+                )
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setCancelable(false)
+                .setNegativeButton("Copy Stack Trace") { _, _ ->
+                    copyToClipboard("Stack trace", fullTrace)
+                }
+                .setPositiveButton("Ok", null)
+                .show()
+
+            param.setResult(null)
+        }
+
+        // Hook startStoreActivity (method h) — the general paywall/store launcher
+        // This fires when the "app restart required" dialog appears (album clicks, etc.)
+        findClass(paywallUtils).hook("h", HookStage.BEFORE) { param ->
+            val args = param.args()
+            val storeParams = args.getOrNull(1)?.toString() ?: "unknown"
+            val upsellType = args.getOrNull(2)?.toString() ?: "unknown"
+            val stackTrace = Thread.currentThread().stackTrace.dropWhile {
+                !it.toString().contains("LSPHooker") }.drop(1).joinToString("\n")
+            val fullTrace = "=== PAYWALL: startStoreActivity (method h) ===\n" +
+                    "StoreEventParams: $storeParams\n" +
+                    "UpsellType: $upsellType\n" +
+                    "Args: ${args.mapIndexed { i, a -> "[$i] ${a?.javaClass?.name}: $a" }.joinToString("\n")}\n" +
+                    "---\n$stackTrace"
+
+            logi("Paywall intercepted (startStoreActivity): upsellType=$upsellType, params=$storeParams")
+            Logger.writeRaw(fullTrace)
+
+            android.app.AlertDialog.Builder(GrindrPlus.currentActivity)
+                .setTitle("Paywalled Feature Detected (Store)")
+                .setMessage(
+                    "Method: startStoreActivity\n" +
+                            "StoreEventParams: $storeParams\n" +
+                            "UpsellType: $upsellType\n\n" +
+                            "This feature is server-enforced and cannot be bypassed in this version.\n\n" +
                             "You can copy the stack trace below to help with troubleshooting."
                 )
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .setCancelable(false)
                 .setNegativeButton("Copy Stack Trace") { _, _ ->
-                    copyToClipboard(
-                        "Stack trace",
-                        stackTrace
-                    )
+                    copyToClipboard("Stack trace", fullTrace)
                 }
                 .setPositiveButton("Ok", null)
                 .show()

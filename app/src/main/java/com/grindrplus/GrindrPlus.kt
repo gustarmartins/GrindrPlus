@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Application
 import android.app.Application.ActivityLifecycleCallbacks
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -12,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.grindrplus.bridge.BridgeClient
 import com.grindrplus.core.Config
 import com.grindrplus.core.EventManager
@@ -28,8 +30,6 @@ import com.grindrplus.utils.HookManager
 import com.grindrplus.utils.PCHIP
 import com.grindrplus.utils.HookStage
 import com.grindrplus.utils.hookConstructor
-import dalvik.system.DexClassLoader
-import de.robv.android.xposed.XposedHelpers.getObjectField
 import de.robv.android.xposed.XposedHelpers.callMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +43,6 @@ import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import kotlin.system.measureTimeMillis
@@ -107,11 +106,11 @@ object GrindrPlus {
     val currentActivity: Activity?
         get() = currentActivityRef?.get()
 
-    internal val userAgent = "Pb.e" // search for 'grindr3/'
+    internal val userAgent = "as.r" // search for 'grindr3/'
     internal val userSession = "com.grindrapp.android.usersession.b" // search for 'com.grindrapp.android.storage.UserSessionImpl$1'
     private val deviceInfo =
-        "u8.u" // search for 'AdvertisingIdClient.Info("00000000-0000-0000-0000-000000000000", true)'
-    internal val grindrLocationProvider = "ff.e" // search for 'system settings insufficient for location request, attempting to resolve'
+        "ek.y" // search for 'AdvertisingIdClient.Info("00000000-0000-0000-0000-000000000000", true)'
+    internal val grindrLocationProvider = "nz.e" // search for 'system settings insufficient for location request, attempting to resolve'
     internal val serverDrivenCascadeRepo = "com.grindrapp.android.persistence.repository.ServerDrivenCascadeRepo"
     internal val ageVerificationActivity = "com.grindrapp.android.ageverification.presentation.ui.AgeVerificationActivity"
     internal val browseExploreActivity = "com.grindrapp.android.ui.browse.BrowseExploreMapActivity"
@@ -127,7 +126,7 @@ object GrindrPlus {
 
     val serverNotifications = EventManager.serverNotifications
 
-    fun init(modulePath: String, application: Application,
+    fun init(application: Application,
              versionCodes: IntArray, versionNames: Array<String>) {
 
         if (isInitialized) {
@@ -161,12 +160,12 @@ object GrindrPlus {
         }
 
         Config.initialize(application.packageName)
-        val newModule = File(context.filesDir, "grindrplus.dex")
-        File(modulePath).copyTo(newModule, true)
-        newModule.setReadOnly()
 
-        this.classLoader =
-            DexClassLoader(newModule.absolutePath, null, null, context.classLoader)
+        // Legacy cleanup: remove the grindrplus.dex file that was unnecessarily copied on every launch.
+        // This line can be removed in a future version once all users have updated.
+        context.filesDir.resolve("grindrplus.dex").delete()
+
+        this.classLoader = context.classLoader
         this.database = GPDatabase.create(context)
         this.hookManager = HookManager()
         this.instanceManager = InstanceManager(classLoader)
@@ -206,7 +205,9 @@ object GrindrPlus {
         }
 
         try {
+            Logger.e("Setting Up Instance Manager")
             setupInstanceManager()
+            Logger.e("Setting Up Notification Hook")
             setupServerNotificationHook()
         } catch (t: Throwable) {
             Logger.e("Failed to hook critical classes: ${t.message}", LogSource.MODULE)
@@ -223,6 +224,7 @@ object GrindrPlus {
         try {
             val initTime = measureTimeMillis { initializeCore() }
             Logger.i("Initialization completed in $initTime ms", LogSource.MODULE)
+            setupTaskTriggerReceiver()
             isInitialized = true
         } catch (t: Throwable) {
             Logger.e("Failed to initialize: ${t.message}", LogSource.MODULE)
@@ -503,12 +505,12 @@ object GrindrPlus {
         try {
             val dialog = AlertDialog.Builder(activity)
                 .setTitle("Age Verification Required")
-                .setMessage("You are accessing Grindr from the UK where age verification is legally mandated.\n\n" +
+                .setMessage("You are accessing Grindr from a country where age verification is legally mandated.\n\n" +
                         "LEGAL COMPLIANCE NOTICE:\n" +
-                        "GrindrPlus does NOT bypass, disable, or interfere with age verification systems. Any attempt to circumvent age verification requirements is illegal under UK law and is strictly prohibited.\n\n" +
+                        "GrindrPlus does NOT bypass, disable, or interfere with age verification systems. Any attempt to circumvent age verification requirements may be illegal\n\n" +
                         "MANDATORY REQUIREMENTS:\n" +
                         "1. Complete age verification using the official Grindr application\n" +
-                        "2. Comply with all UK legal verification processes\n" +
+                        "2. Comply with all legally required verification processes\n" +
                         "3. Install GrindrPlus only after successful verification through official channels\n\n" +
                         "WARNING:\n" +
                         "The developers of this module are not responsible for any legal consequences resulting from non-compliance with age verification requirements.")
@@ -604,6 +606,32 @@ object GrindrPlus {
                 }
             }
         })
+    }
+
+    private fun setupTaskTriggerReceiver() {
+        try {
+            val filter = android.content.IntentFilter("com.grindrplus.TRIGGER_TASK")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(object : android.content.BroadcastReceiver() {
+                    override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                        val taskId = intent?.getStringExtra("taskId") ?: return
+                        com.grindrplus.core.Logger.d("Manual trigger received for task: $taskId", com.grindrplus.core.LogSource.MODULE)
+                        taskManager.triggerTask(taskId)
+                    }
+                }, filter, android.content.Context.RECEIVER_EXPORTED)
+            } else {
+                ContextCompat.registerReceiver(context, object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        val taskId = intent?.getStringExtra("taskId") ?: return
+                        Logger.d("Manual trigger received for task: $taskId", LogSource.MODULE)
+                        taskManager.triggerTask(taskId)
+                    }
+                }, filter, ContextCompat.RECEIVER_EXPORTED)
+            }
+            Logger.i("Task trigger receiver registered", LogSource.MODULE)
+        } catch (e: Exception) {
+            Logger.e("Failed to register task trigger receiver: ${e.message}", LogSource.MODULE)
+        }
     }
 
     private fun fetchOwnUserId() {

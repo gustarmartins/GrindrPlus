@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.grindrplus.core.Config
+import com.grindrplus.core.FeatureDefinitions
 import com.grindrplus.manager.DATA_URL
 import com.grindrplus.manager.settings.SettingsUtils.testMapsApiKey
 import com.grindrplus.manager.utils.AppIconManager
@@ -25,6 +26,7 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val hookHideList = setOf(
         "Status Dialog",
+        "Feature granting",
     )
 
     private val _settingGroups = MutableStateFlow<List<SettingGroup>>(emptyList())
@@ -65,15 +67,20 @@ class SettingsViewModel(
         _showApiKeyTestDialog.value = true
     }
 
+    private var isInitialLoad = true
+
     init {
         loadSettings()
     }
 
     fun loadSettings() {
         viewModelScope.launch {
-            _isLoading.value = true
+            if (isInitialLoad) {
+                _isLoading.value = true
+            }
 
             try {
+                Config.initialize(Config.getCurrentPackage())
                 val hooks = Config.getHooksSettings()
                 val hookSettings = hooks
                     .filterNot { (hookName, _) -> hookName in hookHideList }
@@ -83,12 +90,7 @@ class SettingsViewModel(
                             title = hookName,
                             description = pair.first,
                             isChecked = pair.second,
-                            onCheckedChange = {
-                                viewModelScope.launch {
-                                    Config.setHookEnabled(hookName, it)
-                                    loadSettings()
-                                }
-                            }
+                            onCheckedChange = { viewModelScope.launch { Config.setHookEnabled(hookName, it) } }
                         )
                     }
 
@@ -99,26 +101,96 @@ class SettingsViewModel(
                         title = taskId,
                         description = pair.first,
                         isChecked = pair.second,
-                        onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.setTaskEnabled(taskId, it)
-                                loadSettings()
+                            onCheckedChange = { viewModelScope.launch { Config.setTaskEnabled(taskId, it) } }
+                    )
+                } + tasks.map { (taskId, _) ->
+                    ButtonSetting(
+                        id = "trigger_${taskId.lowercase().replace(" ", "_")}",
+                        title = "Trigger $taskId Now",
+                        onClick = {
+                            val intent = android.content.Intent("com.grindrplus.TRIGGER_TASK").apply {
+                                setPackage("com.grindrapp.android")
+                                putExtra("taskId", taskId)
                             }
+                            context.sendBroadcast(intent)
                         }
                     )
-                }
+                } + listOf(
+                    TextSetting(
+                        id = "always_online_interval_mins",
+                        title = "Always Online interval (mins)",
+                        description = "How often to fetch cascade to stay online (default: 5)",
+                        value = (Config.get("always_online_interval_mins", 5) as Number).toString(),
+                        onValueChange = {
+                            val value = it.toIntOrNull() ?: 5
+                            viewModelScope.launch { Config.put("always_online_interval_mins", value) }
+                        },
+                        keyboardType = KeyboardType.Number,
+                        validator = { input ->
+                            val value = input.toIntOrNull()
+                            when {
+                                value == null || value <= 0 -> "Must be a positive number"
+                                else -> null
+                            }
+                        }
+                )) 
+                val experimentalUiSettings = listOf(
+                    SwitchSetting(
+                        id = "home_navigation_v2",
+                        title = "Home Navigation 2.0",
+                        description = "Enable the new navigation bar (This causes the duplicate bars?)",
+                        isChecked = Config.get("home_navigation_v2", false) as Boolean,
+                        onCheckedChange = {
+                            viewModelScope.launch { Config.put("home_navigation_v2", it) }
+                        }
+                    ),
+                    SwitchSetting(
+                        id = "discover_v2",
+                        title = "Discover UI",
+                        description = "Enable the Discover tab UI; server-side feature. Not working.",
+                        isChecked = Config.get("discover_v2", false) as Boolean,
+                        onCheckedChange = {
+                            viewModelScope.launch { Config.put("discover_v2", it) }
+                        }
+                    ),
+                    SwitchSetting(
+                        id = "side_profile_link",
+                        title = "Side Profile Link",
+                        description = "Enable the new side profile drawer. Unsure of what it does.",
+                        isChecked = Config.get("side_profile_link", false) as Boolean,
+                        onCheckedChange = {
+                            viewModelScope.launch { Config.put("side_profile_link", it) }
+                        }
+                    )
+                )
 
                 val otherSettings = mutableListOf(
+                    TextSetting(
+                        id = "spoofed_version_name",
+                        title = "Spoofed Version Name",
+                        description = "Simulate a specific Grindr version (default: 26.5.0). Clear to disable spoofing.",
+                        value = Config.get("spoofed_version_name", "26.5.0") as String,
+                        onValueChange = {
+                            viewModelScope.launch { Config.put("spoofed_version_name", it) }
+                        }
+                    ),
+                    TextSetting(
+                        id = "spoofed_version_code",
+                        title = "Spoofed Version Code",
+                        description = "Version code corresponding to the name (default: 154546).",
+                        value = Config.get("spoofed_version_code", "154546") as String,
+                        onValueChange = {
+                            viewModelScope.launch { Config.put("spoofed_version_code", it) }
+                        },
+                        keyboardType = KeyboardType.Number
+                    ),
                     TextSetting(
                         id = "command_prefix",
                         title = "Command Prefix",
                         description = "Change the command prefix (default: /)",
                         value = Config.get("command_prefix", "/") as String,
                         onValueChange = {
-                            viewModelScope.launch {
-                                Config.put("command_prefix", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("command_prefix", it) }
                         },
                         validator = { input ->
                             when {
@@ -135,10 +207,7 @@ class SettingsViewModel(
                         description = "Format for displaying dates in the app (default: MM/dd/yyyy)",
                         value = Config.get("date_format", "MM/dd/yyyy") as String,
                         onValueChange = {
-                            viewModelScope.launch {
-                                Config.put("date_format", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("date_format", it) }
                         },
                         validator = { input ->
                             when {
@@ -157,10 +226,7 @@ class SettingsViewModel(
                         value = (Config.get("online_indicator", 5) as Number).toString(),
                         onValueChange = {
                             val value = it.toIntOrNull() ?: 5
-                            viewModelScope.launch {
-                                Config.put("online_indicator", value)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("online_indicator", value) }
                         },
                         keyboardType = KeyboardType.Number,
                         validator = { input ->
@@ -174,10 +240,7 @@ class SettingsViewModel(
                         description = "Display BMI in the profile section",
                         isChecked = Config.get("show_bmi_in_profile", true) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("show_bmi_in_profile", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("show_bmi_in_profile", it) }
                         }
                     ),
                     TextSetting(
@@ -187,10 +250,7 @@ class SettingsViewModel(
                         value = Config.get("favorites_grid_columns", 3).toString(),
                         onValueChange = {
                             val value = it.toIntOrNull() ?: 3
-                            viewModelScope.launch {
-                                Config.put("favorites_grid_columns", value)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("favorites_grid_columns", value) }
                         },
                         keyboardType = KeyboardType.Number,
                         validator = { input ->
@@ -204,10 +264,7 @@ class SettingsViewModel(
                         description = "Change the Android Device ID",
                         value = Config.get("android_device_id", "") as String,
                         onValueChange = {
-                            viewModelScope.launch {
-                                Config.put("android_device_id", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("android_device_id", it) }
                         },
                         validator = { input ->
                             when {
@@ -222,8 +279,8 @@ class SettingsViewModel(
                                 val uuid = java.util.UUID.randomUUID()
                                 val newDeviceId = uuid.toString().replace("-", "").substring(0, 16)
                                 Config.put("android_device_id", newDeviceId)
-                                loadSettings()
                                 Toast.makeText(context, "New device ID generated", Toast.LENGTH_SHORT).show()
+                                newDeviceId
                             }
                         )
 
@@ -234,10 +291,7 @@ class SettingsViewModel(
                         description = "Enable the ability to send cookie taps to other users (they'll see them)",
                         isChecked = Config.get("enable_cookie_tap", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("enable_cookie_tap", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("enable_cookie_tap", it) }
                         }
                     ),
                     SwitchSetting(
@@ -246,10 +300,7 @@ class SettingsViewModel(
                         description = "Enables what looks like a recommendation section next to Browse",
                         isChecked = Config.get("enable_vip_flag", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("enable_vip_flag", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("enable_vip_flag", it) }
                         }
                     ),
                     SwitchSetting(
@@ -258,10 +309,7 @@ class SettingsViewModel(
                         description = "Show interests section on profiles",
                         isChecked = Config.get("enable_interest_section", true) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("enable_interest_section", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("enable_interest_section", it) }
                         }
                     ),
                     SwitchSetting(
@@ -270,10 +318,7 @@ class SettingsViewModel(
                         description = "Disable profile swipe and open profile on click",
                         isChecked = Config.get("disable_profile_swipe", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("disable_profile_swipe", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("disable_profile_swipe", it) }
                         }
                     ),
                     SwitchSetting(
@@ -282,10 +327,7 @@ class SettingsViewModel(
                         description = "Use the old AntiBlock behavior (don't use this, required for testing)",
                         isChecked = Config.get("force_old_anti_block_behavior", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("force_old_anti_block_behavior", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("force_old_anti_block_behavior", it) }
                         }
                     ),
                     SwitchSetting(
@@ -294,10 +336,7 @@ class SettingsViewModel(
                         description = "Instead of receiving Android notifications, use toasts for block/unblock notifications",
                         isChecked = Config.get("anti_block_use_toasts", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("anti_block_use_toasts", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("anti_block_use_toasts", it) }
                         }
                     ),
                     SwitchSetting(
@@ -306,10 +345,7 @@ class SettingsViewModel(
                         description = "Will delete all local data on next app start",
                         isChecked = Config.get("reset_database", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("reset_database", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("reset_database", it) }
                         }
                     ),
                     SwitchSetting(
@@ -318,25 +354,34 @@ class SettingsViewModel(
                         description = "Prevent graphic glitches when applying GUI based hooks",
                         isChecked = Config.get("do_gui_safety_checks", true) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("do_gui_safety_checks", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("do_gui_safety_checks", it) }
                         }
                     )
                 )
 
                 val managerSettings = mutableListOf<Setting>(
+                    TextSetting(
+                        id = "news_fetch_interval_hours",
+                        title = "News Fetch Interval (hours)",
+                        description = "How often to check for news in the background. Set to 0 to disable automatic fetching (manual only).",
+                        value = (Config.get("news_fetch_interval_hours", 6) as Number).toString(),
+                        onValueChange = {
+                            val value = it.toLongOrNull() ?: 6L
+                            viewModelScope.launch { Config.put("news_fetch_interval_hours", value) }
+                        },
+                        keyboardType = KeyboardType.Number,
+                        validator = { input ->
+                            val value = input.toLongOrNull()
+                            if (value == null || value < 0) "Must be 0 (manual only) or a positive number" else null
+                        }
+                    ),
                     TextSettingWithButtons(
                         id = "maps_api_key",
                         title = "Maps API Key",
                         description = "Use a custom Maps API Key when using Grindr Plus with LSPatch",
                         value = Config.get("maps_api_key", "") as String,
                         onValueChange = {
-                            viewModelScope.launch {
-                                Config.put("maps_api_key", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("maps_api_key", it) }
                         },
                         validator = { null },
                         buttons = listOf(
@@ -352,6 +397,7 @@ class SettingsViewModel(
                                         ::showApiKeyTestDialog
                                     )
                                 }
+                                null
                             }
                         )
                     ),
@@ -361,10 +407,7 @@ class SettingsViewModel(
                         description = "Use a custom manifest URL when using Grindr Plus with LSPatch",
                         value = Config.get("custom_manifest", DATA_URL) as String,
                         onValueChange = {
-                            viewModelScope.launch {
-                                Config.put("custom_manifest", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("custom_manifest", it) }
                         },
                         validator = { null }
                     ),
@@ -374,10 +417,7 @@ class SettingsViewModel(
                         description = "Help improve the app by sending anonymous usage data",
                         isChecked = Config.get("analytics", true) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("analytics", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("analytics", it) }
                         }
                     ),
                     SwitchSetting(
@@ -388,7 +428,6 @@ class SettingsViewModel(
                         onCheckedChange = {
                             viewModelScope.launch {
                                 Config.put("discreet_icon", it)
-                                loadSettings()
 
                                 val appIconManager = AppIconManager(context)
                                 appIconManager.changeAppIcon(if (it) AppIconManager.DISCREET_ICON else AppIconManager.DEFAULT_ICON)
@@ -407,10 +446,7 @@ class SettingsViewModel(
                         description = "Disable permission checks on startup (not recommended)",
                         isChecked = Config.get("disable_permission_checks", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("disable_permission_checks", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("disable_permission_checks", it) }
                         }
                     )
                 )
@@ -422,11 +458,58 @@ class SettingsViewModel(
                         description = "Use Material You colors for the app\nRestart the app to apply changes",
                         isChecked = Config.get("material_you", false) as Boolean,
                         onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("material_you", it)
-                                loadSettings()
-                            }
+                            viewModelScope.launch { Config.put("material_you", it) }
                         }
+                    )
+                }
+
+                // Read the Feature Granting hook state.
+                val featureGrantingEnabled = hooks["Feature granting"]?.second ?: true
+
+                // Build the Feature Granting master toggle.
+                val featureGrantingToggle = SwitchSetting(
+                    id = "hook_feature_granting",
+                    title = "Feature Granting",
+                    description = "Grant all Grindr features. Disable to use the app normally.",
+                    isChecked = featureGrantingEnabled,
+                    onCheckedChange = {
+                        viewModelScope.launch {
+                            Config.setHookEnabled("Feature granting", it)
+                            loadSettings()
+                        }
+                    }
+                )
+
+                // Build per-category sub-groups for feature flags.
+                val flagsByCategory = FeatureDefinitions.ALL
+                    .sortedWith(compareBy({ it.category }, { it.name }))
+                    .groupBy { it.category }
+
+                val featureFlagSubGroups = flagsByCategory.map { (category, defs) ->
+                    SettingGroup(
+                        id = "feature_flags_${category.lowercase().replace(" ", "_")}",
+                        title = "$category (${defs.size})",
+                        settings = defs.map { def ->
+                            val configKey = FeatureDefinitions.configKey(def.name)
+                            val rawValue = Config.get(configKey, def.defaultState.configValue)
+                            val currentState = when (rawValue) {
+                                is Boolean -> FeatureState.fromLegacyBoolean(rawValue)
+                                is String -> FeatureState.fromConfig(rawValue)
+                                else -> def.defaultState
+                            }
+                            TriStateSetting(
+                                id = configKey,
+                                title = def.name,
+                                description = def.description,
+                                state = currentState,
+                                onStateChange = { newState ->
+                                    viewModelScope.launch {
+                                        Config.put(configKey, newState.configValue)
+                                    }
+                                }
+                            )
+                        },
+                        defaultCollapsed = true
                     )
                 }
 
@@ -434,26 +517,45 @@ class SettingsViewModel(
                     SettingGroup(
                         id = "hooks",
                         title = "Manage Hooks",
-                        settings = hookSettings
+                        settings = hookSettings,
+                        collapsable = false
                     ),
                     SettingGroup(
                         id = "tasks",
                         title = "Manage Tasks",
-                        settings = taskSettings
+                        settings = taskSettings,
+                        collapsable = false
+                    ),
+                    SettingGroup(
+                        id = "experimental_ui",
+                        title = "Experimental UI",
+                        settings = experimentalUiSettings,
+                        collapsable = false
                     ),
                     SettingGroup(
                         id = "other",
                         title = "Other Settings",
-                        settings = otherSettings
+                        settings = otherSettings,
+                        collapsable = false
                     ),
                     SettingGroup(
                         id = "manager",
                         title = "Manager Settings",
-                        settings = managerSettings
+                        settings = managerSettings,
+                        collapsable = false
+                    ),
+                    SettingGroup(
+                        id = "feature_flags_debug",
+                        title = "Feature Flags Debug",
+                        defaultCollapsed = true,
+                        headerSetting = featureGrantingToggle,
+                        subGroups = featureFlagSubGroups,
+                        isDisabled = !featureGrantingEnabled
                     ),
                 )
             } finally {
                 _isLoading.value = false
+                isInitialLoad = false
             }
         }
     }

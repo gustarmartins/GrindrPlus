@@ -6,63 +6,63 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.grindrplus.manager.blocks.BlockEvent
-import com.grindrplus.manager.blocks.BlockLogViewModel
-import com.grindrplus.manager.ui.components.BlockLogFilters
-import com.grindrplus.manager.ui.components.FilterPanel
-import com.grindrplus.manager.utils.AppCloneUtils
+import com.grindrplus.manager.tasks.TaskErrorExplainer
+import com.grindrplus.manager.tasks.TaskRunEvent
+import com.grindrplus.manager.tasks.TaskRunViewModel
+import com.grindrplus.manager.ui.components.TaskFilterPanel
+import com.grindrplus.manager.ui.components.TaskLogFilters
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @SuppressLint("ContextCastToActivity")
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BlockLogScreen(innerPadding: PaddingValues) {
+fun TasksScreen(innerPadding: PaddingValues) {
     val activity = LocalContext.current as ComponentActivity
-    val viewModel: BlockLogViewModel = viewModel()
+    val viewModel: TaskRunViewModel = viewModel()
     val events by viewModel.events.collectAsState()
     val filters by viewModel.filters.collectAsState()
     val filteredEvents by viewModel.filteredEvents.collectAsState()
+    val taskHealthScores by viewModel.taskHealthScores.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val availablePackages by viewModel.availablePackages.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        viewModel.loadEvents()
+        viewModel.loadRuns()
     }
 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Clear all events") },
-            text = { Text("Are you sure you want to clear all block/unblock events? This action cannot be undone.") },
+            title = { Text("Clear all task runs") },
+            text = { Text("Are you sure you want to clear all task run history? This action cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.clearEvents()
+                        viewModel.clearRuns()
                         showDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -91,9 +91,9 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
             ) {
                 IconButton(
                     onClick = {
-                        viewModel.exportEventsToFile(activity)
+                        viewModel.exportRunsToFile(activity)
                         scope.launch {
-                            snackbarHostState.showSnackbar("Saving block events JSON file...")
+                            snackbarHostState.showSnackbar("Saving task runs JSON file...")
                         }
                     }
                 ) {
@@ -111,29 +111,15 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
                 }
             }
 
-            FilterPanel(
+            TaskFilterPanel(
                 filters = filters,
-                availablePackages = availablePackages,
                 onFiltersChanged = { newFilters ->
                     viewModel.updateFilters(newFilters)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            if (filters.isActive) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Filtered: ${filteredEvents.size} of ${events.size} events",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+
 
             Box(
                 modifier = Modifier.weight(1f)
@@ -151,17 +137,17 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Error,
-                            contentDescription = "No events",
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "No runs",
                             modifier = Modifier.size(64.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (filters.isActive && events.isNotEmpty())
-                                "No events match your filters"
+                                "No runs match your filters"
                             else
-                                "No block/unblock events found",
+                                "No task runs recorded yet",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -169,7 +155,7 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
                         if (filters.isActive && events.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(
-                                onClick = { viewModel.updateFilters(BlockLogFilters()) }
+                                onClick = { viewModel.updateFilters(TaskLogFilters()) }
                             ) {
                                 Text("Reset Filters")
                             }
@@ -181,6 +167,34 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        item {
+                            if (taskHealthScores.isNotEmpty()) {
+                                LazyRow(
+                                    contentPadding = PaddingValues(bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(taskHealthScores.toList()) { (taskId, score) ->
+                                        TaskHealthCard(taskId = taskId, score = score)
+                                    }
+                                }
+                            }
+
+                            if (filters.isActive) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Filtered: ${filteredEvents.size} of ${events.size} runs",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
                         val dateFormat = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
                         val grouped = filteredEvents.groupBy {
                             dateFormat.format(Date(it.timestamp))
@@ -203,15 +217,7 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
                             }
 
                             items(dateEvents) { event ->
-                                BlockEventItem(
-                                    event = event,
-                                    onCopyId = {
-                                        clipboardManager.setText(AnnotatedString(event.profileId))
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("Profile ID copied to clipboard")
-                                        }
-                                    }
-                                )
+                                TaskRunItem(event = event)
                             }
                         }
                     }
@@ -229,24 +235,20 @@ fun BlockLogScreen(innerPadding: PaddingValues) {
 }
 
 @Composable
-fun BlockEventItem(
-    event: BlockEvent,
-    onCopyId: () -> Unit
-) {
+fun TaskRunItem(event: TaskRunEvent) {
     val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
     val time = timeFormat.format(Date(event.timestamp))
 
-    val formattedPackage = remember(event.packageName) {
-        when (val pkg = event.packageName) {
-            null, "com.grindrapp.android" -> null
-            else -> when {
-                pkg.startsWith(AppCloneUtils.GRINDR_PACKAGE_PREFIX) -> {
-                    val cloneName = pkg.removePrefix(AppCloneUtils.GRINDR_PACKAGE_PREFIX)
-                    "Clone ${cloneName.replaceFirstChar { it.uppercase() }}"
-                }
-                else -> pkg.substringAfterLast('.')
-            }
+    val durationText = remember(event.durationMs) {
+        when {
+            event.durationMs < 1000 -> "${event.durationMs}ms"
+            event.durationMs < 60_000 -> "%.1fs".format(event.durationMs / 1000.0)
+            else -> "${event.durationMs / 60_000}m ${(event.durationMs % 60_000) / 1000}s"
         }
+    }
+
+    val explanation = remember(event.error) {
+        TaskErrorExplainer.explain(event.error)
     }
 
     Card(
@@ -262,12 +264,15 @@ fun BlockEventItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Block,
-                    contentDescription = null,
-                    tint = if (event.eventType == "block")
-                        MaterialTheme.colorScheme.error
+                    imageVector = if (event.success)
+                        Icons.Default.CheckCircle
                     else
-                        MaterialTheme.colorScheme.primary,
+                        Icons.Default.Error,
+                    contentDescription = null,
+                    tint = if (event.success)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(24.dp)
                 )
 
@@ -277,67 +282,113 @@ fun BlockEventItem(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = event.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = event.taskId,
+                        style = MaterialTheme.typography.titleMedium
                     )
 
                     Text(
-                        text = if (event.eventType == "block")
-                            "Blocked you"
-                        else
-                            "Unblocked you",
+                        text = if (event.success) "Completed successfully" else "Failed",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
-                    if (formattedPackage != null) {
-                        Text(
-                            text = formattedPackage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
 
-                Text(
-                    text = time,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Divider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ID: ${event.profileId}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(
-                    onClick = onCopyId,
-                    modifier = Modifier.size(32.dp)
+                Column(
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy ID",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                    Text(
+                        text = time,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = durationText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
+            }
+
+            if (!event.success && event.error != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                HorizontalDivider()
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = event.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (explanation != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = explanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskHealthCard(taskId: String, score: Float) {
+    val scorePercentage = (score * 100).toInt()
+    val color = when {
+        score >= 0.8f -> MaterialTheme.colorScheme.primary
+        score >= 0.5f -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
+    
+    Card(
+        modifier = Modifier.padding(4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = taskId, style = MaterialTheme.typography.labelMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { score },
+                    color = color,
+                    trackColor = MaterialTheme.colorScheme.surface,
+                    strokeWidth = 4.dp,
+                    modifier = Modifier.size(48.dp)
+                )
+                Text(
+                    text = "$scorePercentage%",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
             }
         }
     }

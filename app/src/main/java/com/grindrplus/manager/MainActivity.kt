@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color.TRANSPARENT
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -72,16 +71,15 @@ import com.grindrplus.bridge.NotificationActionReceiver
 import com.grindrplus.core.Config
 import com.grindrplus.core.Constants.GRINDR_PACKAGE_NAME
 import com.grindrplus.core.Logger
-import com.grindrplus.manager.MainNavItem.*
-import com.grindrplus.manager.ui.BlockLogScreen
+import com.grindrplus.manager.MainNavItem.Home
 import com.grindrplus.manager.ui.CalculatorScreen
+import com.grindrplus.manager.ui.LogsScreen
 import com.grindrplus.manager.ui.HomeScreen
 import com.grindrplus.manager.ui.InstallPage
-import com.grindrplus.manager.ui.SettingsScreen
 import com.grindrplus.manager.ui.NotificationScreen
+import com.grindrplus.manager.ui.SettingsScreen
 import com.grindrplus.manager.ui.theme.GrindrPlusTheme
 import com.grindrplus.manager.utils.FileOperationHandler
-import com.grindrplus.manager.utils.isLSPosed
 import com.grindrplus.utils.HookManager
 import com.grindrplus.utils.TaskManager
 import com.onebusaway.plausible.android.AndroidResourcePlausibleConfig
@@ -113,9 +111,10 @@ sealed class MainNavItem(
 
     data object Home : MainNavItem(Icons.Rounded.Home, "Home", { HomeScreen(this) })
 
-    data object BlockLog : MainNavItem(Icons.Filled.History, "Block Log", { BlockLogScreen(this) })
+    data object BlockLog : MainNavItem(Icons.Filled.History, "Logs", { LogsScreen(this) })
 
-    data object Notifications : MainNavItem(Icons.Filled.Newspaper, "News", { NotificationScreen(this) })
+    data object Notifications :
+        MainNavItem(Icons.Filled.Newspaper, "News", { NotificationScreen(this) })
 
     // data object Albums : MainNavItem(Icons.Rounded.PhotoAlbum, "Albums", { ComingSoon() })
     // data object Experiments : MainNavItem(Icons.Rounded.Science, "Experiments", { ComingSoon() })
@@ -267,10 +266,22 @@ class MainActivity : ComponentActivity() {
                             client = NetworkFirstPlausibleClient(config)
                         )
 
+                        fun getHooks() =
+                            Config.getCurrentPackageConfig().optJSONObject("hooks")?.let {
+                                val keyToEnabled = mutableMapOf<String, Any>();
+                                for (key in it.keys()) {
+                                    keyToEnabled[key] =
+                                        it.getJSONObject(key).optBoolean("enabled", false) as Any
+                                }
+                                keyToEnabled
+                            } ?: emptyMap<String, Any>().toMutableMap()
+
                         plausible?.enable(true)
                         plausible?.pageView(
                             "app://grindrplus/home",
-                            props = mapOf("android_version" to Build.VERSION.SDK_INT)
+                            props = getHooks().apply {
+                                put("android_version", Build.VERSION.SDK_INT)
+                            }
                         )
                     }
 
@@ -279,7 +290,6 @@ class MainActivity : ComponentActivity() {
                         patchInfoDialog = true
                         plausible?.pageView("app://grindrplus/first_launch")
                         Config.put("first_launch", false)
-
                     }
                 }
             }

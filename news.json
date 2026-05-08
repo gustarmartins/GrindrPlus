@@ -98,5 +98,10 @@
     "message_id": 195,
     "text": "Grindr is down once again. This is NOT caused by Grindr Plus.\n\nThere is nothing we (or you) can do about it. Please wait until it’s fixed by Grindr.\n\nPlease DO NOT spam the chat with messages like “My app doesn’t work” or “The feed doesn’t load,” or we will lock the chat.\n\nKeep checking the status here: https://status.grindr.com/",
     "date": 1770760034
+  },
+  {
+    "message_id": 196,
+    "text": "We are aware of a weird issue affecting the main grid. We're not sure what's causing it, but it looks like some sort of A/B testing on Grindr's side.\n\n⚠️ Please DO NOT spam the chat with the same issue over and over again ⚠️, it won't magically fix it.\n\nSome users have reported that it returns to normal after a few minutes, but it seems very random.",
+    "date": 1773430838
   }
 ]

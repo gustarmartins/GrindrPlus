@@ -4,12 +4,17 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.core.app.NotificationCompat
 import com.google.gson.JsonParser
 import com.grindrplus.R
 import com.grindrplus.core.Config
+import com.grindrplus.core.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.io.IOException
@@ -22,43 +27,67 @@ class GPlusMessage(
     val timestamp: Long
 )
 
-const val CHANNEL_PING_URL = "https://github.com/R0rt1z2/GrindrPlus/raw/refs/heads/master/news.json"
+const val CHANNEL_PING_URL = "https://github.com/gustarmartins/GrindrPlus/raw/refs/heads/master/news.json"
 val tgMessages = MutableStateFlow<List<GPlusMessage>>(listOf())
+private val fetchMutex = Mutex()
 
-suspend fun fetchNotifs(context: Context) = withContext(Dispatchers.IO) {
-    val client = OkHttpClient.Builder()
-        .callTimeout(1000.seconds.toJavaDuration()).build()
+fun isNetworkAvailable(context: Context): Boolean {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val network = cm.activeNetwork ?: return false
+    val capabilities = cm.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+}
 
-    val request = okhttp3.Request.Builder()
-        .url(CHANNEL_PING_URL)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-        )
-        .build()
+suspend fun fetchNotifs(context: Context) {
+    if (fetchMutex.isLocked) return
+    
+    fetchMutex.withLock {
+        withContext(Dispatchers.IO) {
+            // avoids spam
+            if (!isNetworkAvailable(context)) return@withContext
 
-    client.newCall(request).execute().use { response ->
-        if (!response.isSuccessful) throw IOException("Unexpected code $response")
+            val client = OkHttpClient.Builder()
+                .callTimeout(30.seconds.toJavaDuration()).build()
 
-        tgMessages.value =
-            JsonParser.parseString(response.body!!.string()).asJsonArray
-                .map { it.asJsonObject }
-                .map { obj ->
-                    GPlusMessage(
-                        obj.get("message_id").asString,
-                        obj.get("text").asString,
-                        obj.get("date").asLong
-                    )
+            val request = okhttp3.Request.Builder()
+                .url(CHANNEL_PING_URL)
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+                )
+                .build()
+
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw IOException("Unexpected code $response")
+
+                    tgMessages.value =
+                        JsonParser.parseString(response.body!!.string()).asJsonArray
+                            .map { it.asJsonObject }
+                            .map { obj ->
+                                GPlusMessage(
+                                    obj.get("message_id").asString,
+                                    obj.get("text").asString,
+                                    obj.get("date").asLong
+                                )
+                            }
+                            .filterNot { it.content.isBlank() }
+                            .sortedBy { it.id }.toList()
+                    
+                    Config.put("last_news_fetch_ms", System.currentTimeMillis())
+
+                    val msg = tgMessages.value.lastOrNull() ?: return@use
+                    if (Config.get("last_push_id", "") != msg.id) {
+                        Config.put("last_push_id", msg.id)
+                        if (msg.content.contains("#push"))
+                            sendNotification(context, msg.content.replace("#push", "").trim())
+                        else sendNotification(context)
+                    }
                 }
-                .filterNot { it.content.isBlank() }
-                .sortedBy { it.id }.toList()
-
-        val msg = tgMessages.value.lastOrNull() ?: return@use
-        if (Config.get("last_push_id", "") != msg.id) {
-            Config.put("last_push_id", msg.id)
-            if (msg.content.contains("#push"))
-                sendNotification(context, msg.content.replace("#push", "").trim())
-            else sendNotification(context)
+            } catch (e: Exception) {
+                Logger.e("fetchNotifs: Failed to fetch notifications: ${e.message}")
+            }
         }
     }
 }

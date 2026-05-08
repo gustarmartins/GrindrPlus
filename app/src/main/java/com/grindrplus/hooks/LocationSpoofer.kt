@@ -54,7 +54,6 @@ class LocationSpoofer : Hook(
     var gpsLocationLatitude: Double = 0.0
     var gpsLocationLongitude: Double = 0.0
 
-
     override fun init() {
         val locationClass = findClass(location)
 
@@ -201,8 +200,7 @@ class LocationSpoofer : Hook(
                 )
                 orientation = RadioGroup.VERTICAL
             }
-
-            // Add RadioButtons dynamically
+            
             suspend fun refreshLocations(newSelectedLocatioName: String = "") {
                 locations = getLocations()
                 val selectedLocationName = newSelectedLocatioName.ifEmpty {
@@ -298,6 +296,7 @@ class LocationSpoofer : Hook(
 
                     val coordinates = location.let { "${it.latitude}, ${it.longitude}" }
                     Config.put("current_location", coordinates)
+                    FlushSession.refresh()
                     GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to $coordinates")
                 }
             }
@@ -369,6 +368,7 @@ class LocationSpoofer : Hook(
                 if (location == null) {
                     Config.put("current_location", "")
                     Config.put("current_location_name", "")
+                    FlushSession.refresh()
                     GrindrPlus.showToast(Toast.LENGTH_SHORT, "Teleporting stopped")
                     return
                 }
@@ -376,6 +376,7 @@ class LocationSpoofer : Hook(
                 val coordinates = location.let { "${it.latitude}, ${it.longitude}" }
                 Config.put("current_location", coordinates)
                 Config.put("current_location_name", location.name)
+                FlushSession.refresh()
                 GrindrPlus.showToast(Toast.LENGTH_LONG, "Teleported to ${location.name}")
             }
 
@@ -468,6 +469,46 @@ class LocationSpoofer : Hook(
             }
         }
 
+        val buttonLoadSpoofed = Button(context).apply {
+            text = "Load from Spoofed GPS"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = 70
+                marginEnd = 70
+                bottomMargin = 16
+            }
+            setOnClickListener {
+                val spoofedCoords = (Config.get("forced_coordinates",
+                    Config.get("current_location", "")) as String)
+                    .takeIf { it.isNotEmpty() }
+                    ?.split(",")
+
+                if (spoofedCoords == null || spoofedCoords.size != 2) {
+                    GrindrPlus.showToast(Toast.LENGTH_SHORT, "No spoofed location active")
+                    return@setOnClickListener
+                }
+
+                val lat = spoofedCoords[0].trim().toDoubleOrNull()
+                val lon = spoofedCoords[1].trim().toDoubleOrNull()
+
+                if (lat == null || lon == null) {
+                    GrindrPlus.showToast(Toast.LENGTH_SHORT, "Invalid spoofed coordinates")
+                    return@setOnClickListener
+                }
+
+                inputLatitude.setText(lat.toString())
+                inputLongitude.setText(lon.toString())
+
+                val locationName = (Config.get("current_location_name", "") as String)
+                    .takeIf { it.isNotEmpty() }
+                if (locationName != null) {
+                    inputName.setText(locationName)
+                }
+            }
+        }
+
         val buttonPickOnMap = Button(context).apply {
             text = "Pick on map"
             layoutParams = LinearLayout.LayoutParams(
@@ -479,10 +520,12 @@ class LocationSpoofer : Hook(
                 bottomMargin = 16
             }
             setOnClickListener {
-                mapsLocationPickerDialog(context, { tle ->
+                val initialLat = inputLatitude.text.toString().toDoubleOrNull() ?: gpsLocationLatitude
+                val initialLng = inputLongitude.text.toString().toDoubleOrNull() ?: gpsLocationLongitude
+                mapsLocationPickerDialog(context, initialLat, initialLng) { tle ->
                     inputLatitude.setText(tle.latitude.toString())
                     inputLongitude.setText(tle.longitude.toString())
-                })
+                }
             }
         }
 
@@ -491,6 +534,7 @@ class LocationSpoofer : Hook(
         container.addView(inputLatitude)
         container.addView(inputLongitude)
         container.addView(buttonLoadGps)
+        container.addView(buttonLoadSpoofed)
         container.addView(buttonPickOnMap)
 
         suspend fun saveLocation(): Boolean {
@@ -535,7 +579,12 @@ class LocationSpoofer : Hook(
         }
     }
 
-    private fun mapsLocationPickerDialog(context: Context, onLocationPicked: (TeleportLocationEntity) -> Unit) {
+    private fun mapsLocationPickerDialog(
+        context: Context,
+        initialLat: Double = gpsLocationLatitude,
+        initialLng: Double = gpsLocationLongitude,
+        onLocationPicked: (TeleportLocationEntity) -> Unit
+    ) {
         var selectedLatLng: Any? = null
         var marker: Any? = null
 
@@ -561,9 +610,9 @@ class LocationSpoofer : Hook(
 
         container.addView(mapView)
 
-        // create initial LatLng (set to current gps position)
+        // create initial LatLng (use provided initial position)
         val latLngClass = findClass("com.google.android.gms.maps.model.LatLng")
-        selectedLatLng = XposedHelpers.newInstance(latLngClass, gpsLocationLatitude, gpsLocationLongitude)
+        selectedLatLng = XposedHelpers.newInstance(latLngClass, initialLat, initialLng)
 
         // create marker options
         val markerOptionsClass = findClass("com.google.android.gms.maps.model.MarkerOptions")
@@ -650,6 +699,7 @@ class LocationSpoofer : Hook(
         }
 
     }
+
     private suspend fun getLocations(): List<TeleportLocationEntity> = withContext(Dispatchers.IO) {
         return@withContext GrindrPlus.database.teleportLocationDao().getLocations()
     }

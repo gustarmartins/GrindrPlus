@@ -168,8 +168,8 @@ class SettingsViewModel(
                     TextSetting(
                         id = "spoofed_version_name",
                         title = "Spoofed Version Name",
-                        description = "Simulate a specific Grindr version (default: 26.5.0). Clear to disable spoofing.",
-                        value = Config.get("spoofed_version_name", "26.5.0") as String,
+                            description = "Simulate a specific Grindr version (default: 26.9.1). Clear to disable spoofing.",
+                            value = Config.get("spoofed_version_name", "26.9.1") as String,
                         onValueChange = {
                             viewModelScope.launch { Config.put("spoofed_version_name", it) }
                         }
@@ -177,8 +177,8 @@ class SettingsViewModel(
                     TextSetting(
                         id = "spoofed_version_code",
                         title = "Spoofed Version Code",
-                        description = "Version code corresponding to the name (default: 154546).",
-                        value = Config.get("spoofed_version_code", "154546") as String,
+                            description = "Version code corresponding to the name (default: 163471).",
+                            value = Config.get("spoofed_version_code", "163471") as String,
                         onValueChange = {
                             viewModelScope.launch { Config.put("spoofed_version_code", it) }
                         },

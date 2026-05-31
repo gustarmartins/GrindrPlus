@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
 
 import com.grindrplus.hooks.unsafeTrustManager
 import com.grindrplus.hooks.unsafeSslContext
@@ -263,40 +264,27 @@ class Client(interceptor: Interceptor) {
         shuffle: Boolean = false,
         hot: Boolean = false
     ): JSONObject = withContext(Dispatchers.IO) {
-        try {
-            val url = buildString {
-                append("https://grindr.mobi/v3/cascade?nearbyGeoHash=$nearbyGeoHash")
-                append("&onlineOnly=$onlineOnly")
-                append("&photoOnly=$photoOnly")
-                append("&faceOnly=$faceOnly")
-                append("&notRecentlyChatted=$notRecentlyChatted")
-                append("&fresh=$fresh")
-                append("&pageNumber=$pageNumber")
-                append("&favorites=$favorites")
-                append("&showSponsoredProfiles=$showSponsoredProfiles")
-                append("&shuffle=$shuffle")
-                append("&hot=$hot")
-            }
+        val url = buildString {
+            append("https://grindr.mobi/v4/cascade?nearbyGeoHash=$nearbyGeoHash")
+            append("&onlineOnly=$onlineOnly")
+            append("&photoOnly=$photoOnly")
+            append("&faceOnly=$faceOnly")
+            append("&notRecentlyChatted=$notRecentlyChatted")
+            append("&fresh=$fresh")
+            append("&pageNumber=$pageNumber")
+            append("&favorites=$favorites")
+            append("&showSponsoredProfiles=$showSponsoredProfiles")
+            append("&shuffle=$shuffle")
+            append("&hot=$hot")
+        }
 
-            val response = sendRequest(url, "GET")
-            if (response.isSuccessful) {
-                response.useBody { responseBody ->
-                    if (!responseBody.isNullOrEmpty()) {
-                        return@withContext JSONObject(responseBody)
-                    }
-                    JSONObject()
-                }
-            } else {
-                Logger.e("Failed to get nearby profiles: ${response.code}")
-                response.useBody { errorBody ->
-                    Logger.e("Error body: $errorBody")
-                }
-                JSONObject()
-            }
-        } catch (e: Exception) {
-            Logger.e("Failed to get nearby profiles: ${e.message}")
-            Logger.writeRaw(e.stackTraceToString())
-            JSONObject()
+        val response = sendRequest(url, "GET")
+        if (!response.isSuccessful) {
+            val errorBody = response.useBody { it }?.take(200).orEmpty()
+            throw IOException("HTTP ${response.code}${if (errorBody.isNotEmpty()) " — $errorBody" else ""}")
+        }
+        response.useBody { responseBody ->
+            if (responseBody.isNullOrEmpty()) JSONObject() else JSONObject(responseBody)
         }
     }
 

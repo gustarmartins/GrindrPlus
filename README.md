@@ -3,35 +3,34 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/R0rt1z2/GrindrPlus/actions/workflows/build_apk.yml?query=branch%3Amaster+event%3Apush+is%3Acompleted"><img src="https://img.shields.io/github/actions/workflow/status/R0rt1z2/GrindrPlus/build_apk.yml?branch=master&logo=github&label=Build" alt="Build"></a>
-  <img src="https://shields.io/github/downloads/R0rt1z2/GrindrPlus/total?logo=Bookmeter&label=Downloads&logoColor=Green&color=Green" alt="Total downloads">
+  <a href="https://github.com/gustarmartins/GrindrPlus/actions/workflows/build_apk.yml?query=branch%3Amaster+event%3Apush+is%3Acompleted"><img src="https://img.shields.io/github/actions/workflow/status/gustarmartins/GrindrPlus/build_apk.yml?branch=master&logo=github&label=Build" alt="Build"></a>
+  <img src="https://shields.io/github/downloads/gustarmartins/GrindrPlus/total?logo=Bookmeter&label=Downloads&logoColor=Green&color=Green" alt="Total downloads">
   <a href="https://discord.gg/invite/SPb6Kc7S4C"><img src="https://img.shields.io/discord/1161706617729974352?label=Discord&logo=discord" alt="Discord"></a>
-  <a href="https://t.me/GrindrPlus"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=flat&logo=telegram&logoColor=white" alt="Telegram"></a>
+  <a href="https://t.me/GrindrPlus2"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=flat&logo=telegram&logoColor=white" alt="Telegram"></a>
 </p>
 <h1 align="center">Grindr Plus</h1>
 
 
 <p align="center">
-Grindr Plus is an Xposed Module that unlocks and adds unique features to the Grindr app, enhancing user experience.
+Grindr Plus is a Xposed Module that unlocks and adds unique features to the Grindr app, enhancing user experience.
 </p>
 
 ## Introduction
-This repository contains a completely rewritten version of [ElJaviLuki's original mod](https://github.com/ElJaviLuki/GrindrPlus), rebuilt from the ground up. It introduces new features, ensures compatibility with the latest Grindr versions, and offers improved performance and functionality.
+GrindrPlus is an actively maintained Xposed module that unlocks and extends the Grindr app with features unavailable in the official version. It has been significantly rewritten and extended over time by the community.
 
 As the title of the repo suggests, this mod is designed to enhance the user experience, but please note that it’s under active development, so stability is not always guaranteed.
 
-Neither I ([@R0rt1z2](https://github.com/R0rt1z2)) nor any contributors listed here are affiliated with Grindr LLC. For any important inquiries related to this repository, feel free to reach out to me directly at hello@r0rt1z2.com.
+Neither I ([@gustarmartins](https://github.com/gustarmartins)) nor any contributors listed here are affiliated with Grindr LLC.
 
 Use this mod at your own discretion, and be aware that future updates may introduce changes or require further adjustments.
 
 ## Disclaimer
-This mod is provided for free with no warranty of any kind. Use at your own risk! We are not responsible for lost chats, user data, unexpected bans or any other problems incurred from the use of this module.
+This mod is provided for free with no warranty of any kind. Use at your own risk! I am not responsible for lost chats, user data, unexpected bans or any other problems incurred from the use of this module or from patching.
 
 This mod does not collect any personal data nor does it display ads of any kind. No earnings are generated or collected from the use of this software. This project is open source so you can check all these facts by your own!
 
 ## Downloads
-* You can download the latest stable release by visiting the [releases page](https://github.com/R0rt1z2/GrindrPlus/releases).
-* You can grab the most recent CI build from the [actions section](https://github.com/R0rt1z2/GrindrPlus/actions) or join our [Telegram CI channel](https://t.me/GrindrPlus).
+* You can download the latest release by visiting the [releases page](https://github.com/gustarmartins/GrindrPlus/releases).
 
 ## Features
 <details closed>
@@ -57,7 +56,7 @@ This mod does not collect any personal data nor does it display ads of any kind.
   - `Ability to see ban details`
   - `Ability to spoof Android ID`
   - `Removed most analytics`
-  - `Unlock developer special features`
+  - `Unlock developer special features flags`
   - `Built-in mod settings to manage hooks`
   - `Disable forced app updates (extend mod lifespan)`
 </details>
@@ -92,7 +91,7 @@ This mod does not collect any personal data nor does it display ads of any kind.
   - `Saved chat phrases`
   - `Disable boosting upsells`
   - `Hide your own views`
-  - `Incognito mode`
+  - `Incognito mode (partial functionality)`
 </details>
 
 ## Bugs
@@ -101,16 +100,15 @@ This mod does not collect any personal data nor does it display ads of any kind.
 > Please read this section carefully before reporting bugs. Many issues listed here are known limitations.
 
 - **Google Login (LSPatch only)**: Requires a workaround to function properly. See the [FAQ section](#faq--troubleshooting) for detailed instructions.
-- **Incognito Mode**: Does not work reliably and turns off automatically after a short period.
+- **Incognito Mode**: Does not make you disappear from the cascade (grid) - but does hide your online status. Might toggle it back to Online, but that is a UI quirk (Incognito persists)
 - **"Viewed Me" List**: Will not work as this is a server-side feature that cannot be modified.
 - **Boosting & Roaming**: Disabled by default. To enable, turn off the "Disable Boosting" hook in settings and restart Grindr.
-- **Random Crashes/Album Editing Issues**: If you experience crashes or cannot edit your own albums, disable the "Unlimited Albums" hook.
 - **In-app Maps (LSPatch only)**: Maps functionality (explore, shared locations in chats) requires a custom Google Maps API key. See the [FAQ section](#faq--troubleshooting) for setup instructions.
 - **Saved Locations Button**: Does not appear on cloned/dual apps.
-- **LSPatch Limitations**: Users may experience additional stability issues compared to LSPosed installations.
+- **LSPatch Limitations**: Users may experience more issues compared to LSPosed installations.
 
 > [!TIP]
-> Before reporting a new bug, please check our [Discord](https://discord.gg/invite/SPb6Kc7S4C) or [Telegram](https://t.me/GrindrPlus) channels to see if it's already known.
+> Before reporting a new bug, please use the Issues tab and search; or access channels that are now archived on Telegram and/or Discord.
 
 ## Installation
 > <small>[!WARNING]
@@ -127,11 +125,11 @@ Each installation method is completely different and comes with its own challeng
 - No Grindr installed on device
 
 **Process:**
-1. Download & Install the GrindrPlus module APK (check the [downloads](https://github.com/R0rt1z2/GrindrPlus?tab=readme-ov-file#downloads) section of this `README`).
+1. Download & Install the GrindrPlus module APK (check the [downloads](https://github.com/gustarmartins/GrindrPlus?tab=readme-ov-file#downloads) section of this `README`).
 2. If the Grindr app is installed, uninstall it. **Make sure it's also gone from Secure Folder, Second Space or Private Space**.
 3. Open the new "Grindr Plus" app and click on the "Install" button (bottom left).
 4. Wait for the versions to load (if loading seems stuck, force close app & retry).
-5. Select your preferred version (we recommend using latest).
+5. If version can not install from server, you must use the Custom method (you download the base from ApkMirror and use the mod .apk from releases)
 6. Click on the "Install" button.
 7. Wait for the installation to complete. Duration will depend on connection speed and phone's specs.
 8. When prompted, install the newly generated Grindr app.
@@ -149,15 +147,13 @@ Each installation method is completely different and comes with its own challeng
 <details closed>
   <summary>Root (LSPosed)</summary>
 
-> **Make sure you're using [JingMatrix's fork of LSPosed](https://github.com/R0rt1z2/LSMirror/raw/refs/heads/main/LSPosed-v1.10.1-7167-zygisk-release.zip)!**
-
 **Requirements:**
 - Rooted using `Magisk` or `KernelSU`
 - `LSPosed` installed and fully functional
 
 **Process:**
-1. Install the GrindrPlus module APK (check the [downloads](https://github.com/R0rt1z2/GrindrPlus?tab=readme-ov-file#downloads) section of this `README`)
-2. Download the latest Grindr app [from Play Store](https://play.google.com/store/apps/details?id=com.grindrapp.android&hl=en) or use [SAI](https://github.com/Aefyr/SAI/releases) to install [bundles from APKMirror](https://www.apkmirror.com/apk/grindr-llc/grindr-gay-chat-meet-date/)
+1. Install the GrindrPlus module APK (check the [downloads](https://github.com/gustarmartins/GrindrPlus?tab=readme-ov-file#downloads) section of this `README`)
+2. Download the v26.0.1 or the related version of Grindr app [from Play Store](https://play.google.com/store/apps/details?id=com.grindrapp.android&hl=en) or use [SAI](https://github.com/Aefyr/SAI/releases) to install [bundles from APKMirror](https://www.apkmirror.com/apk/grindr-llc/grindr-gay-chat-meet-date/)
 3. Turn on the module in `LSPosed` and make sure Grindr is in scope
 4. Open Grindr and verify the installation is working
 
@@ -206,7 +202,7 @@ Read our [Development docs](docs/README.md)
 <details>
   <summary>My Grindr app suddenly stops / crashes when the module is installed!</summary> 
 
-- Make sure you're using a good LSPatch/LSPosed version (official are broken on latest Android versions). Consider switching to [JingMatrix's fork](https://github.com/JingMatrix) if you haven't already.
+- Make sure you're using a good LSPatch/LSPosed version
 - Check if the module supports the app version. Grindr has lots of obfuscated symbols that change in each app update and the module couldn't work (or couldn't work properly).
 </details>
 <details>
@@ -233,7 +229,7 @@ Read our [Development docs](docs/README.md)
 <details>
   <summary>Where can I download the latest stable build?</summary>
 
-- https://github.com/R0rt1z2/GrindrPlus/releases
+- https://github.com/gustarmartins/GrindrPlus/releases
 </details>
 <details>
   <summary>Can I suggest a new feature?</summary>
@@ -253,31 +249,23 @@ Read our [Development docs](docs/README.md)
 </details>
 
 ## Acknowledgments
-Big part of the credit goes to [ElJaviLuki](https://github.com/ElJaviLuki/GrindrPlus), the creator of the original idea and mod — this project wouldn’t exist without his initial work.
+Special thanks to [@Truffle2143](https://github.com/Truffle2143) (Voxei) for providing the obfuscation values that made the 26.1.0 update possible.
 
-This project relies on several third-party libraries, and we extend our gratitude to their authors for their valuable contributions. For a complete list of these dependencies, please refer to the [dependencies](https://github.com/R0rt1z2/GrindrPlus/blob/master/app/build.gradle.kts#L67-L79) section of the `build.gradle.kts` file.
+This project relies on several third-party libraries, and we extend our gratitude to their authors for their valuable contributions. For a complete list of these dependencies, please refer to the [dependencies](https://github.com/gustarmartins/GrindrPlus/blob/master/app/build.gradle.kts) section of the `build.gradle.kts` file.
 
 Parts of the manager were coded with the help of [Vendetta's Manager](https://github.com/vendetta-mod/VendettaManager).
 
-I would also like to give special recognition to [@rhunk](https://github.com/rhunk) and the other developers of [SE](https://github.com/rhunk/SnapEnhance). Their work has been very useful for this mod, and some portions of their code have been used here.
+Special recognition also goes to [@rhunk](https://github.com/rhunk) and the other developers of [SnapEnhance](https://github.com/rhunk/SnapEnhance). Their work has been very useful for this mod, and some portions of their code have been used here.
+
+and of course, Roger for maintaining the module for years until now. Thanks.
 
 ## Contributing
-This project is open to any kind of contribution. Feel free to [open a pull request](https://github.com/R0rt1z2/GrindrPlus/pulls) or [submit an issue](https://github.com/R0rt1z2/GrindrPlus/issues)! [Discussions section](https://github.com/R0rt1z2/GrindrPlus/discussions) also available!
-
-## Donations
-I don't usually ask for donations, but if you really want to support me, you can do so by sending me a coffee!
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/r0rt1z2)
-
-[![PayPal](https://cdn.rawgit.com/twolfson/paypal-github-button/1.0.0/dist/button.svg)](https://www.paypal.me/R0rt1z2/)
+This project is open to any kind of contribution. Feel free to [open a pull request](https://github.com/gustarmartins/GrindrPlus/pulls) or [submit an issue](https://github.com/gustarmartins/GrindrPlus/issues)! [Discussions section](https://github.com/gustarmartins/GrindrPlus/discussions) also available!
 
 ## Related resources
-- [Official XDA thread](https://forum.xda-developers.com/t/mod-xposed-new-grindr-plus.4461857/#post-87076193)
 - [Downloads for Grindr (APKMirror)](https://www.apkmirror.com/apk/grindr-llc/grindr-gay-chat-meet-date)
-- [JingMatrix's LSPosed fork](https://github.com/JingMatrix/LSPosed)
-- [JingMatrix's LSPatch fork](https://github.com/JingMatrix/LSPatch)
 
 ## License
-This project is distributed under the GPL-3.0 License. For more information, simply refer to the [LICENSE](https://github.com/R0rt1z2/GrindrPlus/blob/master/LICENSE) file. Please note that the [`old_base`](https://github.com/R0rt1z2/GrindrPlus/tree/old_base) branch is not subjected to any license, as the original author did not assign or attribute one.
+This project is distributed under the GPL-3.0 License. For more information, refer to the [LICENSE](https://github.com/gustarmartins/GrindrPlus/blob/master/LICENSE) file.
 
-As an open source project, you're free to inspire yourself from this code. However, please **DON'T copy it and release it as your own (kanging)**. Give the proper credit and reference to the [original project](https://github.com/R0rt1z2/GrindrPlus) and its [contributors](https://github.com/R0rt1z2/GrindrPlus/graphs/contributors).
+As an open source project, you're free to inspire yourself from this code. However, please **DON'T copy it and release it as your own (kanging)**. Give the proper credit and reference to the [original project](https://github.com/gustarmartins/GrindrPlus) and its [contributors](https://github.com/gustarmartins/GrindrPlus/graphs/contributors).

@@ -96,6 +96,11 @@ class AssignmentsInterceptor : Hook(
 
     private val dumpKeywords = listOf("feature", "subscription", "entitlement", "upsell")
 
+    private val cascadeUpsellTypes = setOf(
+        "xtra_mpu_v1", "unlimited_mpu_v1", "boost_upsell_v1",
+        "favs_xtra_upsell_v1", "favs_unlimited_upsell_v1"
+    )
+
     private fun isDumpMode(): Boolean =
         Config.get("dump_raw_assignments", false) as Boolean
 
@@ -113,13 +118,25 @@ class AssignmentsInterceptor : Hook(
         val path = callMethod(url, "encodedPath") as String
         val dumpMode = isDumpMode()
 
+        val isCascadePath = path.contains("/cascade")
+        if (isCascadePath) {
+            return try {
+                val body = callMethod(response, "body") ?: return response as Any
+                val contentType = callMethod(body, "contentType")
+                val originalJson = callMethod(body, "string") as String
+                val modifiedJson = rewriteCascade(originalJson, path)
+                rebuildResponse(response, body, modifiedJson, contentType)
+            } catch (e: Exception) {
+                loge("Error intercepting cascade $path: ${e.message}")
+                response as Any
+            }
+        }
+
         val isInterestingPath = if (dumpMode) {
             path in dumpPaths || dumpKeywords.any { path.lowercase().contains(it) }
         } else {
             path in assignmentPaths
         }
-
-
 
         if (!isInterestingPath) {
             return response as Any
@@ -178,7 +195,6 @@ class AssignmentsInterceptor : Hook(
         val root = JSONObject(originalJson)
         val assignments = root.optJSONArray("assignments") ?: JSONArray()
 
-        // Index existing assignments by key for fast lookup
         val assignmentMap = mutableMapOf<String, JSONObject>()
         for (i in 0 until assignments.length()) {
             val assignment = assignments.getJSONObject(i)
@@ -201,7 +217,6 @@ class AssignmentsInterceptor : Hook(
                 else -> def.defaultState
             }
 
-            // this is to let the server's own value stay
             if (state == FeatureState.DEFAULT) {
                 passthroughCount++
                 continue
@@ -239,5 +254,50 @@ class AssignmentsInterceptor : Hook(
         )
 
         return root.toString()
+    }
+
+    private fun rewriteCascade(originalJson: String, path: String): String {
+        var json = originalJson
+        var promotedCount = 0
+
+        if (json.contains("partial_profile_v1")) {
+            val before = json
+            json = json.replace("\"type\":\"partial_profile_v1\"", "\"type\":\"full_profile_v1\"")
+            json = json.replace("\"type\": \"partial_profile_v1\"", "\"type\": \"full_profile_v1\"")
+            if (json != before) {
+                promotedCount = Regex("partial_profile_v1").findAll(before).count() -
+                    Regex("partial_profile_v1").findAll(json).count()
+            }
+        }
+
+        var removedUpsells = 0
+        try {
+            val root = JSONObject(json)
+            if (root.has("items")) {
+                val items = root.getJSONArray("items")
+                val newItems = JSONArray()
+                for (i in 0 until items.length()) {
+                    val item = items.getJSONObject(i)
+                    val type = item.optString("type", "")
+                    if (type !in cascadeUpsellTypes) {
+                        newItems.put(item)
+                    } else {
+                        removedUpsells++
+                    }
+                }
+                if (removedUpsells > 0) {
+                    root.put("items", newItems)
+                    json = root.toString()
+                }
+            }
+        } catch (e: Exception) {
+            loge("Error parsing cascade JSON to remove upsells: ${e.message}")
+        }
+
+        if (promotedCount > 0 || removedUpsells > 0) {
+            logd("Cascade unlock ($path): promoted $promotedCount partial→full, removed $removedUpsells upsell items")
+        }
+
+        return json
     }
 }

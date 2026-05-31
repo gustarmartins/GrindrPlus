@@ -68,13 +68,13 @@ class TaskRunViewModel : ViewModel() {
         
         for ((taskId, runs) in groupedByTask) {
             if (runs.size < 2) {
-                scores[taskId] = 1.0f // Default to 1.0 if not enough data
+                scores[taskId] = 1.0f
                 continue
             }
             
             val expectedIntervalMs = when(taskId) {
-                "Always Online" -> (Config.get("always_online_interval_mins", 5) as Number).toLong() * 60 * 1000
-                else -> 10 * 60 * 1000L // Default 10 mins for typical tasks
+                "Always Online" -> (Config.get("always_online_interval_mins", 15) as Number).toLong() * 60 * 1000
+                else -> 10 * 60 * 1000L
             }
             
             val sortedRuns = runs.sortedBy { it.timestamp }

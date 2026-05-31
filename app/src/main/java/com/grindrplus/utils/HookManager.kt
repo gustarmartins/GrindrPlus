@@ -13,12 +13,11 @@ import com.grindrplus.hooks.DisableAnalytics
 import com.grindrplus.hooks.DisableBoosting
 import com.grindrplus.hooks.DisableShuffle
 import com.grindrplus.hooks.DisableUpdates
-// import com.grindrplus.hooks.EmptyCalls
+import com.grindrplus.hooks.EmptyCalls
 import com.grindrplus.hooks.EnableUnlimited
 import com.grindrplus.hooks.ExpiringMedia
 import com.grindrplus.hooks.FeatureGranting
 import com.grindrplus.hooks.FlushSession
-// import com.grindrplus.hooks.LocalSavedPhrases
 import com.grindrplus.hooks.LocationSpoofer
 import com.grindrplus.hooks.NotificationAlerts
 import com.grindrplus.hooks.OnlineIndicator
@@ -30,7 +29,7 @@ import com.grindrplus.hooks.TimberLogging
 import com.grindrplus.hooks.UnlimitedAlbums
 import com.grindrplus.hooks.UnlimitedProfiles
 import com.grindrplus.hooks.UnlockExplorer
-import com.grindrplus.hooks.WebSocketAlive
+// import com.grindrplus.hooks.WebSocketAlive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
@@ -52,12 +51,11 @@ class HookManager {
                 DisableBoosting(),
                 DisableShuffle(),
                 DisableUpdates(),
-                // EmptyCalls(),
+                EmptyCalls(),
                 EnableUnlimited(),
                 ExpiringMedia(),
                 FeatureGranting(),
                 FlushSession(),
-                // LocalSavedPhrases(),
                 LocationSpoofer(),
                 NotificationAlerts(),
                 OnlineIndicator(),

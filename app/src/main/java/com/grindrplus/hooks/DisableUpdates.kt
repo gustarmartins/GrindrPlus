@@ -49,8 +49,8 @@ class DisableUpdates : Hook(
     }
 
     private fun readConfigAndUpdate() {
-        val spoofedName = Config.get("spoofed_version_name", "26.5.0") as String
-        val spoofedCodeStr = Config.get("spoofed_version_code", "154546") as String
+        val spoofedName = Config.get("spoofed_version_name", "26.9.1") as String
+        val spoofedCodeStr = Config.get("spoofed_version_code", "163471") as String
         val spoofedCode = spoofedCodeStr.toIntOrNull() ?: 0
 
         if (spoofedName.isNotEmpty() && spoofedCode > 0) {

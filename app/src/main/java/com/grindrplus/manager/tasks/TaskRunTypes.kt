@@ -10,15 +10,19 @@ data class TaskRunEvent(
 
 object TaskErrorExplainer {
     private val explanations = listOf(
-        "cascade instance" to "App was killed by Android or user hasn't logged in yet",
         "Location provider not initialized" to "Location services aren't ready yet",
         "Location unavailable" to "Android killed background location access; no spoofed location fallback",
         "standby" to "Android killed background location access; no spoofed location fallback",
-        "errorCode=500" to "Server error — likely Android battery restrictions on Grindr",
-        "HTTP 500" to "Server error — likely Android battery restrictions on Grindr",
-        "fetchCascadePage" to "Grindr version incompatibility with the method signature",
-        "Unable to find" to "Grindr version incompatibility with the method signature",
-        "Wrong number of arguments" to "Version mismatch — cascade parameters changed",
+        "HTTP 401" to "Auth token rejected — try re-logging into Grindr",
+        "HTTP 403" to "Auth token rejected — try re-logging into Grindr",
+        "HTTP 429" to "Rate limited by Grindr — increase the Always Online interval",
+        "HTTP 500" to "Grindr server error",
+        "HTTP 502" to "Grindr server temporarily unavailable",
+        "HTTP 503" to "Grindr server temporarily unavailable",
+        "EAI_NODATA" to "No network/DNS — background data may be restricted for Grindr",
+        "Unable to resolve host" to "No network/DNS — background data may be restricted for Grindr",
+        "getaddrinfo" to "No network/DNS — background data may be restricted for Grindr",
+        "timeout" to "Network timeout — connection may be restricted in the background",
         "Task returned false" to "Task completed but reported failure (check debug logs for details)"
     )
 

@@ -17,6 +17,8 @@ abstract class Task(
 ) {
     private var job: Job? = null
 
+    open val enabledByDefault: Boolean = true
+
     open var lastError: String? = null
         protected set
 
@@ -97,7 +99,7 @@ abstract class Task(
         Config.initTaskSettings(
             id,
             description,
-            true // enabled by default
+            enabledByDefault
         )
     }
 }

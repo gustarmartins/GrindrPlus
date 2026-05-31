@@ -49,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
@@ -502,7 +503,9 @@ fun SettingGroupSection(
     onSettingChanged: () -> Unit,
     isSubGroup: Boolean = false,
 ) {
-    var isCollapsed by remember(group.id) { mutableStateOf(group.defaultCollapsed) }
+    var isCollapsed by rememberSaveable(key = "group_collapsed_${group.id}") {
+        mutableStateOf(group.defaultCollapsed)
+    }
 
     Column(
         modifier = Modifier

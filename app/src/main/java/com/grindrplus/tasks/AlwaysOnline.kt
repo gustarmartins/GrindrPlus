@@ -2,7 +2,6 @@ package com.grindrplus.tasks
 
 import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
-import com.grindrplus.core.CoroutineHelper.callSuspendFunction
 import com.grindrplus.core.Logger
 import com.grindrplus.core.Utils.coordsToGeoHash
 import com.grindrplus.core.logd
@@ -16,16 +15,17 @@ import de.robv.android.xposed.XposedHelpers.getObjectField
 class AlwaysOnline :
     Task(
         id = "Always Online",
-        description = "Keeps you online by periodically fetching cascade",
+        description = "Keeps you online by periodically fetching cascade. May be blocked by Android doze/battery or OEM background limits, and can stop working if your Grindr session/token expires (re-open Grindr to refresh).",
         initialDelayMillis = 5 * 1000,
-        intervalMillis = (Config.get("always_online_interval_mins", 5) as Number).toLong() * 60 * 1000
+        intervalMillis = (Config.get("always_online_interval_mins", 15) as Number).toLong() * 60 * 1000
     ) {
+    override val enabledByDefault: Boolean = false
+
     var lastRunTime: Long = 0
         private set
     var lastRunSuccess: Boolean = false
         private set
     override var lastError: String? = null
-        protected set
     var runCount: Int = 0
         private set
 
@@ -35,18 +35,6 @@ class AlwaysOnline :
         logd("AlwaysOnline run #$runNumber starting (last run: ${if (lastRunTime > 0) "${(System.currentTimeMillis() - lastRunTime) / 1000}s ago" else "never"})")
 
         try {
-            val serverDrivenCascadeRepoInstance =
-                GrindrPlus.instanceManager.getInstance<Any>(GrindrPlus.serverDrivenCascadeRepo)
-            if (serverDrivenCascadeRepoInstance == null) {
-                lastRunTime = System.currentTimeMillis()
-                lastRunSuccess = false
-                lastError = "Unable to access the cascade instance. " +
-                        "This could mean the Grindr process was killed or frozen by Android, " +
-                        "or that you have not logged into your account yet."
-                logw("Run #$runNumber skipped: $lastError")
-                return false
-            }
-
             val grindrLocationProviderInstance =
                 GrindrPlus.instanceManager.getInstance<Any>(GrindrPlus.grindrLocationProvider)
             if (grindrLocationProviderInstance == null) {
@@ -66,7 +54,7 @@ class AlwaysOnline :
                 longitude = callMethod(location, "getLongitude") as Double
             } else {
                 // app does not have Location access permissions or something else
-                // for task to work anyways we can fall back to spoofed coordinates (if present) from Config.
+                // for task to work anyway we can fall back to spoofed coordinates (if present) from Config.
                 val coords = (Config.get("forced_coordinates",
                     Config.get("current_location", "")) as String)
                     .takeIf { it.isNotEmpty() }
@@ -89,73 +77,26 @@ class AlwaysOnline :
             }
             val geoHash = coordsToGeoHash(latitude, longitude)
 
-            val methodName = "fetchCascadePage"
-            val method =
-                serverDrivenCascadeRepoInstance.javaClass.methods.firstOrNull {
-                    it.name == methodName
-                } ?: throw IllegalStateException("Unable to find $methodName method")
-
-            val expectedParamCount = method.parameterCount - 1 // exclude continuation
-            logd("Run #$runNumber: calling $methodName (expects $expectedParamCount params + continuation)")
-
-            val params = arrayOfNulls<Any?>(expectedParamCount)
-            
-            if (expectedParamCount >= 1) params[0] = geoHash
-            if (expectedParamCount >= 2) params[1] = null
-            if (expectedParamCount >= 6) {
-                params[2] = false
-                params[3] = false
-                params[4] = false
-                params[5] = false
-            }
-            if (expectedParamCount >= 23) {
-                params[21] = false
-                params[22] = 1
-            }
-            if (expectedParamCount >= 28) {
-                params[25] = false
-                params[26] = false
-                params[27] = false
-            }
-            if (expectedParamCount >= 30) params[29] = false
-            
-            logd("Run #$runNumber: invoking $methodName with ${params.size} parameters")
-
-            if (params.size != expectedParamCount) {
-                lastRunTime = System.currentTimeMillis()
-                lastRunSuccess = false
-                lastError = "Wrong number of arguments in Always Online module. Expected $expectedParamCount, got ${params.size}. " +
-                        "This likely means that this module is outdated and should be disabled for now."
-                loge("Run #\$runNumber failed: $lastError")
-                return false
-            }
-
-            val result = callSuspendFunction { continuation ->
-                method.invoke(serverDrivenCascadeRepoInstance, *params, continuation)
-            }
+            logd("Run #$runNumber: fetching cascade for geoHash $geoHash")
+            val result = GrindrPlus.httpClient.fetchCascade(geoHash)
 
             lastRunTime = System.currentTimeMillis()
-            if (result.toString().contains("Success")) {
+            if (result.has("items")) {
                 lastRunSuccess = true
                 lastError = null
                 logd("Run #$runNumber completed successfully (next run in ${intervalMillis / 1000}s)")
                 return true
             } else {
                 lastRunSuccess = false
-                val resultStr = result.toString()
-                lastError = "Unexpected result: $resultStr"
+                lastError = "Cascade fetch returned no profiles (HTTP 200, empty result)."
                 loge("Run #$runNumber failed: $lastError")
-                if (resultStr.contains("errorCode=500")) {
-                    logw("Hint: HTTP 500 often occurs when the system restricts Grindr in background. " +
-                        "Try setting Grindr to 'Unrestricted' in battery optimization settings.")
-                }
                 return false
             }
         } catch (e: Exception) {
             lastRunTime = System.currentTimeMillis()
             lastRunSuccess = false
-            lastError = e.message
-            loge("Run #$runNumber failed: Unknown error in Always Online task: $lastError")
+            lastError = "Cascade fetch failed: ${e.message}"
+            loge("Run #$runNumber failed: $lastError")
             Logger.writeRaw(e.stackTraceToString())
             return false
         }

@@ -538,20 +538,21 @@ class LocationSpoofer : Hook(
         container.addView(buttonPickOnMap)
 
         suspend fun saveLocation(): Boolean {
-            val name = inputName.text.toString()
             val lat = inputLatitude.text.toString().toDoubleOrNull()
             val lon = inputLongitude.text.toString().toDoubleOrNull()
 
-            if (lat == null || lon == null || name.isEmpty()) {
-                GrindrPlus.showToast(Toast.LENGTH_SHORT, "All fields are required")
+            if (lat == null || lon == null) {
+                GrindrPlus.showToast(Toast.LENGTH_SHORT, "All coordinates are required!")
                 return false
             }
+
+            val name = inputName.text.toString().trim().ifEmpty { "$lat, $lon" }
 
             val locations = getLocations()
             val locationNames = locations.map { it.name }
 
             if (locationNames.contains(name)) {
-                GrindrPlus.showToast(Toast.LENGTH_SHORT, "Location with this name already exists")
+                GrindrPlus.showToast(Toast.LENGTH_SHORT, "A location has already been saved with this name!")
                 return false
             }
 
@@ -568,8 +569,6 @@ class LocationSpoofer : Hook(
             setPositiveButton("Save", null)
 
             val dialog = show()
-            // set listener here instead of in setPositiveButton to be able to prevent the dialog from closing
-            // setPositiveButton listener always closes it
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 coroutineScope.launch {
                     if (saveLocation())
@@ -610,7 +609,6 @@ class LocationSpoofer : Hook(
 
         container.addView(mapView)
 
-        // create initial LatLng (use provided initial position)
         val latLngClass = findClass("com.google.android.gms.maps.model.LatLng")
         selectedLatLng = XposedHelpers.newInstance(latLngClass, initialLat, initialLng)
 
@@ -622,7 +620,6 @@ class LocationSpoofer : Hook(
 
         // set initial marker position
         callMethod(markerOptions, "position", selectedLatLng)
-
 
         // implement OnMapClickListener via proxy
         val onMapClickListener = Proxy.newProxyInstance(

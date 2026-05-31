@@ -36,6 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.grindrplus.core.Config
@@ -80,6 +87,7 @@ fun InstallPage(context: Activity, innerPadding: PaddingValues, viewModel: Insta
     var installation by remember { mutableStateOf<Installation?>(null) }
     var warningBannerVisible by remember { mutableStateOf(true) }
     var lsposedBannerVisible by remember { mutableStateOf(isLSPosed) }
+    var infoBannerVisible by remember { mutableStateOf(true) }
     var showCustomFileDialog by remember { mutableStateOf(false) }
     var useCustomFiles by remember { mutableStateOf(false) }
     var customVersionName by remember { mutableStateOf("custom") }
@@ -251,12 +259,23 @@ fun InstallPage(context: Activity, innerPadding: PaddingValues, viewModel: Insta
             }
 
             MessageBanner(
-                text = "Auto-download for Grindr is no longer supported. Please download the Grindr base APK manually from APKMirror, then select 'Use Custom Files...' below to install.",
-                isVisible = true,
+                text = buildAnnotatedString {
+                    append("Heads up: remote install fetches the Grindr base APK from a third-party server that I don't own or control (Thanks to ")
+                    withLink(LinkAnnotation.Url("https://github.com/imaoreo")) {
+                        withStyle(SpanStyle(
+                            color = Color(0xFF2196F3),
+                            textDecoration = TextDecoration.Underline
+                        )) {
+                            append("@Jay")
+                        }
+                    }
+                    append("). If it fails due to unavailable network errors, please use the 'Use Custom Files...' option below.")
+                },
+                isVisible = infoBannerVisible,
                 isPulsating = false,
                 modifier = Modifier.fillMaxWidth(),
                 type = BannerType.INFO,
-                onDismiss = null
+                onDismiss = { infoBannerVisible = false }
             )
 
             Row(

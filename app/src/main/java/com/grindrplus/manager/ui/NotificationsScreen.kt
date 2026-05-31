@@ -145,6 +145,7 @@ fun MessageBubble(message: com.grindrplus.manager.GPlusMessage) {
                 MarkdownText(
                     markdown = message.content,
                     syntaxHighlightColor = Color.Transparent,
+                    isTextSelectable = true,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))

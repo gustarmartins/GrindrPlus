@@ -2,6 +2,7 @@ package com.grindrplus.hooks
 
 import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
+import com.grindrplus.core.Logger
 import com.grindrplus.ui.Utils
 import com.grindrplus.utils.Feature
 import com.grindrplus.utils.FeatureManager
@@ -33,9 +34,13 @@ class FeatureGranting : Hook(
 
 		// search for 'Assignment.Flag'
         findClass(isFeatureFlagEnabled).hook("a", HookStage.BEFORE) { param ->
-            val flagKey = callMethod(param.args()[0], "toString") as String
-            if (featureManager.isManaged(flagKey)) {
-                param.setResult(featureManager.getForcedValue(flagKey))
+            val flag = param.args()[0]
+            val key = runCatching { callMethod(flag, "getKey") as String }.getOrNull()
+            val label = runCatching { callMethod(flag, "toString") as String }.getOrNull()
+            val managed = listOfNotNull(key, label).firstOrNull { featureManager.isManaged(it) }
+
+            if (managed != null) {
+                param.setResult(featureManager.getForcedValue(managed))
             }
         }
 
@@ -103,8 +108,6 @@ class FeatureGranting : Hook(
         featureManager.add(Feature("CookieTap", Config.get("enable_cookie_tap", false, true) as Boolean))
         featureManager.add(Feature("VipFlag", Config.get("enable_vip_flag", false, true) as Boolean))
         featureManager.add(Feature("enable-mutual-taps-no-paywall", !(Config.get("enable_interest_section", true, true) as Boolean)))
-        featureManager.add(Feature("home-navigation-v2", Config.get("home_navigation_v2", false, true) as Boolean))
-        featureManager.add(Feature("discover-v2", Config.get("discover_v2", false, true) as Boolean))
         featureManager.add(Feature("side-profile-link", Config.get("side_profile_link", false, true) as Boolean))
     }
 }

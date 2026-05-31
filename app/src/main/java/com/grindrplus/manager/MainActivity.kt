@@ -254,7 +254,7 @@ class MainActivity : ComponentActivity() {
                         checkUnknownSourcesPermission()
                     }
 
-                    if (Config.get("analytics", true) as Boolean) {
+                    if (Config.get("analytics", false) as Boolean) {
                         val config = AndroidResourcePlausibleConfig(this@MainActivity).also {
                             it.domain = "grindrplus.lol"
                             it.host = "https://plausible.gmmz.dev/api/"

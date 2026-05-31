@@ -18,6 +18,7 @@ import com.grindrplus.core.Config
 import com.grindrplus.core.LogSource
 import com.grindrplus.core.Logger
 import com.grindrplus.manager.fetchNotifs
+import com.grindrplus.manager.fetchRemoteSpoof
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -90,16 +91,25 @@ class BridgeService : Service() {
                 periodicTasksExecutor.scheduleWithFixedDelay(
                     {
                         try {
+                            if (!Config.isConfigLoaded) return@scheduleWithFixedDelay
+
+                            val now = System.currentTimeMillis()
                             val intervalHours = (Config.get("news_fetch_interval_hours", 6) as Number).toLong()
-                            // 0 = user disabled automatic fetching entirely.
-                            if (intervalHours <= 0) return@scheduleWithFixedDelay
 
-                            val lastFetchMs = (Config.get("last_news_fetch_ms", 0L) as Number).toLong()
-                            val intervalMs = intervalHours * 60L * 60L * 1000L
-                            val elapsedMs = System.currentTimeMillis() - lastFetchMs
+                            if (intervalHours > 0) {
+                                val lastFetchMs = (Config.get("last_news_fetch_ms", 0L) as Number).toLong()
+                                val intervalMs = intervalHours * 60L * 60L * 1000L
+                                if (now - lastFetchMs >= intervalMs) {
+                                    runBlocking { fetchNotifs(this@BridgeService) }
+                                }
+                            }
 
-                            if (elapsedMs >= intervalMs) {
-                                runBlocking { fetchNotifs(this@BridgeService) }
+                            if (Config.get("auto_update_spoof", true) as Boolean) {
+                                val spoofIntervalHours = if (intervalHours > 0) intervalHours else 6L
+                                val lastSpoofMs = (Config.get("last_spoof_fetch_ms", 0L) as Number).toLong()
+                                if (now - lastSpoofMs >= spoofIntervalHours * 60L * 60L * 1000L) {
+                                    runBlocking { fetchRemoteSpoof(this@BridgeService) }
+                                }
                             }
                         } catch (e: Exception) {
                             Timber.tag(TAG).e(e, "Error in periodic news fetch check")
@@ -118,7 +128,7 @@ class BridgeService : Service() {
                     this,
                     1001,
                     notification,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                     } else {
                         0

@@ -46,6 +46,22 @@ class UnlimitedProfiles : Hook(
                 param.setResult(null)
             }
 
+        findClass(serverDrivenCascadeCachedProfile)
+            .hook("getIsPartialProfile", HookStage.BEFORE) { param ->
+                param.setResult(false)
+            }
+        findClass(serverDrivenCascadeCachedProfile)
+            .hook("isPartialProfile", HookStage.BEFORE) { param ->
+                param.setResult(false)
+            }
+
+        findClass("com.grindrapp.android.ui.storeV2.UpsellBottomBarView")
+            .hook("a", HookStage.BEFORE) { param ->
+                val view = param.arg<Any>(0)
+                callMethod(view, "setVisibility", 8)
+                param.setResult(null)
+            }
+
         val profileClass = findClass("com.grindrapp.android.persistence.model.Profile")
         val profileWithPhotoClass = findClass(profileWithPhoto)
         val function2Class = findClass(function2)

@@ -184,6 +184,7 @@ fun HomeScreen(innerPadding: PaddingValues, viewModel: HomeViewModel = viewModel
                             MarkdownText(
                                 markdown = release.description,
                                 syntaxHighlightColor = Color.Transparent,
+                                isTextSelectable = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }

@@ -14,6 +14,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.grindrplus.core.Config
 import com.grindrplus.core.FeatureDefinitions
 import com.grindrplus.manager.DATA_URL
+import com.grindrplus.manager.fetchRemoteSpoof
 import com.grindrplus.manager.settings.SettingsUtils.testMapsApiKey
 import com.grindrplus.manager.utils.AppIconManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,10 +120,10 @@ class SettingsViewModel(
                     TextSetting(
                         id = "always_online_interval_mins",
                         title = "Always Online interval (mins)",
-                        description = "How often to fetch cascade to stay online (default: 5)",
-                        value = (Config.get("always_online_interval_mins", 5) as Number).toString(),
+                        description = "How often to fetch cascade to stay online (default: 15)",
+                        value = (Config.get("always_online_interval_mins", 15) as Number).toString(),
                         onValueChange = {
-                            val value = it.toIntOrNull() ?: 5
+                            val value = it.toIntOrNull() ?: 15
                             viewModelScope.launch { Config.put("always_online_interval_mins", value) }
                         },
                         keyboardType = KeyboardType.Number,
@@ -135,24 +136,8 @@ class SettingsViewModel(
                         }
                 )) 
                 val experimentalUiSettings = listOf(
-                    SwitchSetting(
-                        id = "home_navigation_v2",
-                        title = "Home Navigation 2.0",
-                        description = "Enable the new navigation bar (This causes the duplicate bars?)",
-                        isChecked = Config.get("home_navigation_v2", false) as Boolean,
-                        onCheckedChange = {
-                            viewModelScope.launch { Config.put("home_navigation_v2", it) }
-                        }
-                    ),
-                    SwitchSetting(
-                        id = "discover_v2",
-                        title = "Discover UI",
-                        description = "Enable the Discover tab UI; server-side feature. Not working.",
-                        isChecked = Config.get("discover_v2", false) as Boolean,
-                        onCheckedChange = {
-                            viewModelScope.launch { Config.put("discover_v2", it) }
-                        }
-                    ),
+
+
                     SwitchSetting(
                         id = "side_profile_link",
                         title = "Side Profile Link",
@@ -165,11 +150,22 @@ class SettingsViewModel(
                 )
 
                 val otherSettings = mutableListOf(
+                    SwitchSetting(
+                        id = "auto_update_spoof",
+                        title = "Auto-update spoofed version",
+                        description = "Keep the spoofed Grindr version current automatically from the GrindrPlus server. " +
+                                "Turn off to lock in your own values below.",
+                        isChecked = Config.get("auto_update_spoof", true) as Boolean,
+                        onCheckedChange = {
+                            viewModelScope.launch { Config.put("auto_update_spoof", it) }
+                        }
+                    ),
                     TextSetting(
                         id = "spoofed_version_name",
                         title = "Spoofed Version Name",
-                            description = "Simulate a specific Grindr version (default: 26.9.1). Clear to disable spoofing.",
-                            value = Config.get("spoofed_version_name", "26.9.1") as String,
+                        description = "Simulate a specific Grindr version (default: 26.9.1). Clear to disable spoofing. " +
+                                "Overwritten by the server while auto-update is on.",
+                        value = Config.get("spoofed_version_name", "26.9.1") as String,
                         onValueChange = {
                             viewModelScope.launch { Config.put("spoofed_version_name", it) }
                         }
@@ -177,12 +173,24 @@ class SettingsViewModel(
                     TextSetting(
                         id = "spoofed_version_code",
                         title = "Spoofed Version Code",
-                            description = "Version code corresponding to the name (default: 163471).",
-                            value = Config.get("spoofed_version_code", "163471") as String,
+                        description = "Version code corresponding to the name (default: 163471).",
+                        value = Config.get("spoofed_version_code", "163471") as String,
                         onValueChange = {
                             viewModelScope.launch { Config.put("spoofed_version_code", it) }
                         },
                         keyboardType = KeyboardType.Number
+                    ),
+                    ButtonSetting(
+                        id = "refresh_spoofed_version",
+                        title = "Fetch latest spoofed version",
+                        onClick = {
+                            viewModelScope.launch {
+                                Toast.makeText(context, "Fetching latest spoofed version…", Toast.LENGTH_SHORT).show()
+                                fetchRemoteSpoof(context, force = true)
+                                loadSettings()
+                                Toast.makeText(context, "Spoofed version refreshed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     ),
                     TextSetting(
                         id = "command_prefix",
@@ -412,15 +420,6 @@ class SettingsViewModel(
                         validator = { null }
                     ),
                     SwitchSetting(
-                        id = "analytics",
-                        title = "Opt-in analytics",
-                        description = "Help improve the app by sending anonymous usage data",
-                        isChecked = Config.get("analytics", true) as Boolean,
-                        onCheckedChange = {
-                            viewModelScope.launch { Config.put("analytics", it) }
-                        }
-                    ),
-                    SwitchSetting(
                         id = "discreet_icon",
                         title = "Camouflage app",
                         description = "Hide the app icon and use a different name",
@@ -463,10 +462,8 @@ class SettingsViewModel(
                     )
                 }
 
-                // Read the Feature Granting hook state.
                 val featureGrantingEnabled = hooks["Feature granting"]?.second ?: true
 
-                // Build the Feature Granting master toggle.
                 val featureGrantingToggle = SwitchSetting(
                     id = "hook_feature_granting",
                     title = "Feature Granting",
@@ -480,7 +477,6 @@ class SettingsViewModel(
                     }
                 )
 
-                // Build per-category sub-groups for feature flags.
                 val flagsByCategory = FeatureDefinitions.ALL
                     .sortedWith(compareBy({ it.category }, { it.name }))
                     .groupBy { it.category }

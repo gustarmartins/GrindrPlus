@@ -28,8 +28,10 @@ class GPlusMessage(
 )
 
 const val CHANNEL_PING_URL = "https://github.com/gustarmartins/GrindrPlus/raw/refs/heads/master/news.json"
+const val SPOOF_PING_URL = "https://github.com/gustarmartins/GrindrPlus/raw/refs/heads/master/version_spoof.json"
 val tgMessages = MutableStateFlow<List<GPlusMessage>>(listOf())
 private val fetchMutex = Mutex()
+private val spoofFetchMutex = Mutex()
 
 fun isNetworkAvailable(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -75,9 +77,15 @@ suspend fun fetchNotifs(context: Context) {
                             .filterNot { it.content.isBlank() }
                             .sortedBy { it.id }.toList()
                     
+                    val msg = tgMessages.value.lastOrNull() ?: return@use
+
+                    if (!Config.isConfigLoaded) {
+                        Logger.w("fetchNotifs: config not loaded, skipping notification to avoid spam")
+                        return@use
+                    }
+
                     Config.put("last_news_fetch_ms", System.currentTimeMillis())
 
-                    val msg = tgMessages.value.lastOrNull() ?: return@use
                     if (Config.get("last_push_id", "").toString() != msg.id) {
                         Config.put("last_push_id", msg.id)
                         if (msg.content.contains("#push"))
@@ -87,6 +95,51 @@ suspend fun fetchNotifs(context: Context) {
                 }
             } catch (e: Exception) {
                 Logger.e("fetchNotifs: Failed to fetch notifications: ${e.message}")
+            }
+        }
+    }
+}
+
+suspend fun fetchRemoteSpoof(context: Context, force: Boolean = false) {
+    if (spoofFetchMutex.isLocked) return
+
+    spoofFetchMutex.withLock {
+        withContext(Dispatchers.IO) {
+            if (!isNetworkAvailable(context)) return@withContext
+            if (!Config.isConfigLoaded) return@withContext
+            if (!force && !(Config.get("auto_update_spoof", true) as Boolean)) return@withContext
+
+            val client = OkHttpClient.Builder()
+                .callTimeout(30.seconds.toJavaDuration()).build()
+
+            val request = okhttp3.Request.Builder()
+                .url(SPOOF_PING_URL)
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+                )
+                .build()
+
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw IOException("Unexpected code $response")
+
+                    val obj = JsonParser.parseString(response.body!!.string()).asJsonObject
+                    val name = obj.get("spoofed_version_name")?.asString?.trim()
+                    val code = obj.get("spoofed_version_code")?.asString?.trim()
+
+                    Config.put("last_spoof_fetch_ms", System.currentTimeMillis())
+
+                    if (!name.isNullOrEmpty() && !code.isNullOrEmpty() && code.toIntOrNull() != null) {
+                        Config.put("spoofed_version_name", name)
+                        Config.put("spoofed_version_code", code)
+                        Logger.i("Applied remote spoofed version: $name ($code)")
+                    } else {
+                        Logger.w("fetchRemoteSpoof: remote payload missing/invalid name or code")
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e("fetchRemoteSpoof: Failed to fetch spoofed version: ${e.message}")
             }
         }
     }

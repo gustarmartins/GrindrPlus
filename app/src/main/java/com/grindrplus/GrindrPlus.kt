@@ -111,7 +111,6 @@ object GrindrPlus {
     private val deviceInfo =
         "ek.y" // search for 'AdvertisingIdClient.Info("00000000-0000-0000-0000-000000000000", true)'
     internal val grindrLocationProvider = "nz.e" // search for 'system settings insufficient for location request, attempting to resolve'
-    internal val serverDrivenCascadeRepo = "com.grindrapp.android.persistence.repository.ServerDrivenCascadeRepo"
     internal val ageVerificationActivity = "com.grindrapp.android.ageverification.presentation.ui.AgeVerificationActivity"
     internal val browseExploreActivity = "com.grindrapp.android.ui.browse.BrowseExploreMapActivity"
     internal val serverNotification = "com.grindrapp.android.network.websocket.model.WebSocketNotification\$ServerNotification"
@@ -317,8 +316,7 @@ object GrindrPlus {
             userAgent,
             userSession,
             deviceInfo,
-            grindrLocationProvider,
-            serverDrivenCascadeRepo
+            grindrLocationProvider
         )
 
         instanceManager.setCallback(userSession) { uSession ->

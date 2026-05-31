@@ -113,5 +113,10 @@
     "message_id": 198,
     "text": "<b>Fix for the 28th May crash:</b> Heard reports of errors when opening Grindr; you can try to patch it yourself in the Settings! Ensure you have enabled the Disable Updates hook and then proceed to change the Spoofed Version Name to 26.9.1 and the Spoofed Version Code to 163471",
     "date": 1780003483
+  },
+  {
+    "message_id": 199,
+    "text": "<b>New release v5.0.1:</b> Please download the mod from <a href=\"https://github.com/gustarmartins/GrindrPlus/releases/tag/v5.0.1-26.0.1\">the v5.0.1 release page</a>.<br><br>If you're using <b>LSPatch</b>, you can update as usual from the <b>Install</b> menu in the GrindrPlus app, no reinstallation of Grindr needed. #push",
+    "date": 1780267561
   }
 ]

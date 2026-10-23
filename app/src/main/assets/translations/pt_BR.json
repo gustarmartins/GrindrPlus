@@ -74,6 +74,15 @@
             "teleporting": "Teletransportando",
             "online_now": "Online agora",
             "hidden_profile_details": "Detalhes do perfil ocultos",
+            "profile_id_toast": "ID do perfil: {profileId}",
+            "copy_details": "Copiar detalhes",
+            "copied_to_clipboard": "Detalhes do perfil copiados para a área de transferência",
+            "estimated_creation": "Data estimada de criação",
+            "is_roaming": "Está em roaming",
+            "found_via_roam": "Encontrado por roaming",
+            "is_top_pick": "É uma escolha em destaque",
+            "is_visiting": "Está de visita",
+            "is_distance_approximate": "A distância é aproximada",
             "ok": "OK",
             "underweight": "Abaixo do peso",
             "normal_weight": "Peso normal",
@@ -84,17 +93,146 @@
             "name": "Visualizações de perfil",
             "description": "Controlar se outras pessoas podem ver que você visitou o perfil delas"
         },
+        "anti_block": {
+            "name": "Anti-bloqueio",
+            "description": "Notificar quando alguém bloquear ou desbloquear você",
+            "blocked_by": "Bloqueado por {displayName}",
+            "unblocked_by": "Desbloqueado por {displayName}",
+            "blocked_notification_title": "Bloqueado por alguém",
+            "blocked_notification_message": "Você foi bloqueado por {displayName}",
+            "block_notifications": "Notificações de bloqueio",
+            "block_notifications_description": "Notificações quando alguém bloquear você",
+            "unblock_notification_title": "Desbloqueado por alguém",
+            "unblock_notifications": "Notificações de desbloqueio",
+            "unblock_notifications_description": "Notificações quando alguém desbloquear você"
+        },
+        "anti_detection": {
+            "name": "Anti-detecção",
+            "description": "Ocultar detecções de root, emulador e ambiente"
+        },
+        "assignments_interceptor": {
+            "name": "Interceptador de atribuições",
+            "description": "Simular atribuições de recursos do servidor"
+        },
+        "ban_management": {
+            "name": "Gerenciamento de banimentos",
+            "description": "Exibir informações detalhadas sobre banimentos",
+            "show_ban_details": "Exibir detalhes do banimento",
+            "no_ban_details": "Nenhum detalhe de banimento disponível",
+            "title": "Detalhes do banimento",
+            "generate_device_id": "Gerar novo ID de dispositivo",
+            "copy_json": "Copiar JSON",
+            "copied_to_clipboard": "Detalhes do banimento copiados para a área de transferência",
+            "account_banned": "Sua conta foi banida do Grindr e o servidor respondeu com as seguintes informações:",
+            "device_banned": "Seu dispositivo foi banido, não apenas sua conta. Isso não significa necessariamente que sua conta também foi banida. Você pode contornar essa restrição gerando novas informações de dispositivo.",
+            "details": "Detalhes",
+            "message": "Mensagem",
+            "type": "Tipo",
+            "reason": "Motivo",
+            "automated_ban": "Banimento automático",
+            "third_party_user_id": "ID de usuário de terceiros",
+            "sub_reason": "Motivo secundário",
+            "mail": "E-mail",
+            "phone_number": "Telefone",
+            "dial_code": "Código do país",
+            "yes": "Sim",
+            "no": "Não",
+            "device_id_generated": "Novo ID de dispositivo gerado. O Grindr será reiniciado."
+        },
+        "disable_shuffle": {
+            "name": "Desativar embaralhamento",
+            "description": "Desativar à força o recurso de embaralhamento"
+        },
+        "empty_calls": {
+            "name": "Chamadas de vídeo",
+            "description": "Permitir chamadas de vídeo em conversas vazias"
+        },
+        "flush_session": {
+            "name": "Atualizar sessão",
+            "description": "Permitir atualizar a sessão imediatamente após o teletransporte",
+            "session_refreshed": "Sessão atualizada!"
+        },
+        "location_spoofer_ui": {
+            "teleport_off": "Teletransporte desativado",
+            "add": "Adicionar",
+            "teleport": "Teletransportar",
+            "no_location_selected": "Nenhuma localização selecionada",
+            "teleported_to_coordinates": "Teletransportado para {coordinates}",
+            "view_in_maps": "Ver no mapa",
+            "delete": "Excluir",
+            "teleporting_stopped": "Teletransporte interrompido",
+            "teleported_to_location": "Teletransportado para {name}",
+            "name": "Nome",
+            "latitude": "Latitude",
+            "longitude": "Longitude",
+            "load_from_gps": "Carregar do GPS",
+            "gps_location_unavailable": "Não foi possível obter a localização do GPS",
+            "load_from_spoofed_gps": "Carregar do GPS simulado",
+            "no_spoofed_location": "Nenhuma localização simulada ativa",
+            "invalid_spoofed_coordinates": "Coordenadas simuladas inválidas",
+            "pick_on_map": "Escolher no mapa",
+            "coordinates_required": "Todas as coordenadas são obrigatórias!",
+            "duplicate_location_name": "Já existe uma localização salva com esse nome!",
+            "teleport_locations": "Localizações para teletransporte",
+            "close": "Fechar",
+            "add_location": "Adicionar localização",
+            "cancel": "Cancelar",
+            "save": "Salvar",
+            "pick_location": "Escolher localização"
+        },
+        "notification_alerts": {
+            "name": "Alertas de notificação",
+            "description": "Desativar todos os avisos do Grindr relacionados a notificações"
+        },
         "removable_messages": {
             "name": "Mensagens removíveis",
             "description": "Remover mensagens para ambas as pessoas"
+        },
+        "quick_block": {
+            "name": "Bloqueio rápido",
+            "description": "Permitir bloquear pessoas rapidamente"
         },
         "signature_spoofer": {
             "title": "Simulador de assinatura",
             "description": "Permitir entrar com o Google ao usar o LSPatch"
         },
+        "status_dialog": {
+            "name": "Diálogo de status",
+            "description": "Verificar se o GrindrPlus está ativo",
+            "restart": "Reiniciar",
+            "connected": "Conectado",
+            "disconnected": "Desconectado",
+            "unknown": "Desconhecido",
+            "active": "GrindrPlus está ativo e em execução",
+            "app_information": "Informações do aplicativo",
+            "module_information": "Informações do módulo",
+            "device_information": "Informações do dispositivo",
+            "bridge_status": "Status da ponte",
+            "package": "Pacote",
+            "android_id": "ID do Android",
+            "version": "Versão",
+            "device": "Dispositivo",
+            "android": "Android",
+            "long_press_to_show": "Mantenha esta aba pressionada para exibir este diálogo",
+            "error_retrieving_details": "Erro ao obter detalhes: {error}",
+            "cache_clear_failed": "Falha ao limpar o cache: {error}"
+        },
+        "websocket_alive": {
+            "name": "Manter WebSocket ativo",
+            "description": "Evitar desconexões do WebSocket quando o aplicativo estiver em segundo plano. Pode consumir mais bateria."
+        },
+        "timber_logging": {
+            "name": "Registro do Timber",
+            "description": "Forçar o Timber a registrar mensagens mesmo quando nenhum logger estiver configurado"
+        },
+        "unlock_explorer": {
+            "name": "Desbloquear Explorer",
+            "description": "Desbloquear todos os perfis no Explorer"
+        },
         "unlimited_albums": {
             "name": "Álbuns ilimitados",
-            "description": "Possibilidade de visualizar álbuns sem limite"
+            "description": "Possibilidade de visualizar álbuns sem limite",
+            "failed_to_load_album": "Falha ao carregar o álbum"
         },
         "unlimited_profiles": {
             "name": "Perfis ilimitados",
@@ -112,7 +250,21 @@
             "successfully_updated_location": "{name} atualizado com sucesso!",
             "successfully_saved_location": "{name} salvo com sucesso!",
             "delete_saved_location": "Excluir uma localização salva",
-            "successfully_deleted_location": "{name} excluído com sucesso!"
+            "successfully_deleted_location": "{name} excluído com sucesso!",
+            "forced_coordinates_title": "Teletransporte desativado",
+            "forced_coordinates_message": "O GrindrPlus está usando coordenadas fixas no momento. Desative-as para usar o teletransporte.",
+            "disable": "Desativar",
+            "forced_coordinates_disabled": "Coordenadas fixas desativadas",
+            "provide_location": "Informe uma localização",
+            "invalid_coordinates_format": "Formato de coordenadas inválido",
+            "no_location_provided": "Nenhuma localização informada",
+            "provide_location_to_delete": "Informe a localização que deseja excluir",
+            "location_deleted": "Localização excluída",
+            "geocoding_error": "Ocorreu um erro ao buscar a localização: {error}",
+            "unknown_error": "Erro desconhecido",
+            "teleport_help": "Teletransportar para um local",
+            "save_help": "Salvar a localização atual",
+            "delete_help": "Excluir uma localização salva"
         },
         "profile": {
             "open_user_profile": "Abrir perfil de usuário",
@@ -123,7 +275,52 @@
             "profile_ids": "IDs de perfil",
             "copy_my_id": "Copiar meu ID",
             "copy_profile_id": "Copiar ID do perfil",
-            "close": "Fechar"
+            "close": "Fechar",
+            "open_help": "Abrir o perfil de uma pessoa",
+            "block_help": "Bloquear uma pessoa",
+            "clear_help": "Limpar a conversa com uma pessoa",
+            "unblock_help": "Desbloquear uma pessoa",
+            "chat_help": "Abrir uma conversa com uma pessoa",
+            "favorite_help": "Adicionar uma pessoa aos favoritos",
+            "unfavorite_help": "Remover uma pessoa dos favoritos",
+            "blocks_help": "Ver a lista de pessoas bloqueadas",
+            "favorites_help": "Ver a lista de pessoas favoritas",
+            "report_help": "Denunciar uma pessoa",
+            "blocked_users": "Pessoas bloqueadas",
+            "favorited_users": "Pessoas favoritas",
+            "copy": "Copiar",
+            "export": "Exportar",
+            "exported_blocked_users": "Lista de pessoas bloqueadas exportada. Acesse o arquivo nas configurações do mod.",
+            "exported_favorited_users": "Lista de pessoas favoritas exportada. Acesse o arquivo nas configurações do mod.",
+            "profile_id_details": "• Seu ID: {recipient}\n• ID do perfil: {sender}\n• Data estimada de criação: {creationTime}",
+            "estimated_creation": "Data estimada de criação"
+        },
+        "database": {
+            "list_tables_help": "Listar todas as tabelas do banco de dados",
+            "no_tables_found": "Nenhuma tabela encontrada.",
+            "database_tables": "Tabelas do banco de dados",
+            "error": "Erro: {error}",
+            "list_table_help": "Listar todas as linhas de uma tabela específica",
+            "provide_table_name": "Informe o nome de uma tabela.",
+            "no_rows_found": "Nenhuma linha encontrada na tabela {tableName}.",
+            "table_content": "Conteúdo da tabela: {tableName}",
+            "list_databases_help": "Listar os arquivos de banco de dados do aplicativo",
+            "no_databases_found": "Nenhum banco de dados encontrado.",
+            "database_files": "Arquivos de banco de dados"
+        },
+        "utils": {
+            "shell_help": "Executar um comando do shell e exibir o resultado",
+            "provide_shell_command": "Informe um comando do shell para executar",
+            "command_execution_error": "Erro ao executar o comando: {error}",
+            "output": "Resultado",
+            "prefix_help": "Alterar o prefixo dos comandos (padrão: /)",
+            "current_prefix": "O prefixo atual dos comandos é {prefix}",
+            "invalid_prefix": "Prefixo de comando inválido",
+            "prefix_reset": "Prefixo dos comandos redefinido para /",
+            "prefix_single_character": "O prefixo dos comandos deve ter apenas um caractere",
+            "prefix_special_character": "O prefixo dos comandos deve ser um caractere especial (sem letras ou números)",
+            "prefix_already_set": "O prefixo dos comandos já está definido como {prefix}",
+            "prefix_set": "Prefixo dos comandos definido como {prefix}"
         }
     },
     "settings": {

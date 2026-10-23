@@ -1,160 +1,160 @@
 {
     "global": {
-        "version_mismatch": "GrindrPlus: Grindr version mismatch (installed: {installedVersion}, expected: {expectedVersion}). Mod disabled",
-        "unable_to_fetch_translations": "Unable to fetch translations"
+        "version_mismatch": "GrindrPlus: versão do Grindr incompatível (instalada: {installedVersion}, esperada: {expectedVersion}). Mod desativado",
+        "unable_to_fetch_translations": "Não foi possível buscar as traduções"
     },
     "hooks": {
         "allow_screenshots": {
-            "name": "Allow screenshots",
-            "description": "Allow screenshots everywhere in the app"
+            "name": "Permitir capturas de tela",
+            "description": "Permitir capturas de tela em todo o aplicativo"
         },
         "chat_indicators": {
-            "name": "Chat indicators",
-            "description": "Don't show chat markers / indicators to others"
+            "name": "Indicadores de conversa",
+            "description": "Não mostrar marcadores/indicadores de conversa para outras pessoas"
         },
         "chat_terminal": {
-            "name": "Chat terminal",
-            "description": "Create a chat terminal to execute commands"
+            "name": "Terminal de conversa",
+            "description": "Criar um terminal de conversa para executar comandos"
         },
         "disable_analytics": {
-            "name": "Disable analytics",
-            "description": "Disable Grindr analytics (data collection)"
+            "name": "Desativar análise de dados",
+            "description": "Desativar a análise de dados do Grindr (coleta de dados)"
         },
         "disable_boosting": {
-            "name": "Disable boosting",
-            "description": "Get rid of all upsells related to boosting"
+            "name": "Desativar impulsionamento",
+            "description": "Remover todas as ofertas relacionadas ao impulsionamento"
         },
         "disable_updates": {
-            "name": "Disable updates",
-            "description": "Disable forced updates"
+            "name": "Desativar atualizações",
+            "description": "Desativar atualizações obrigatórias"
         },
         "enable_unlimited": {
-            "name": "Enable unlimited",
-            "description": "Enable Grindr Unlimited features"
+            "name": "Ativar o Unlimited",
+            "description": "Ativar os recursos do Grindr Unlimited"
         },
         "expiring_photos": {
-            "name": "Expiring photos",
-            "description": "Allow unlimited photo viewing"
+            "name": "Fotos temporárias",
+            "description": "Permitir visualizar fotos sem limite"
         },
         "favorites": {
-            "name": "Favorites",
-            "description": "Customize layout for the favorites tab"
+            "name": "Favoritos",
+            "description": "Personalizar o layout da aba de favoritos"
         },
         "feature_granting": {
-            "name": "Feature granting",
-            "description": "Grant all Grindr features (including experiments)"
+            "name": "Liberação de recursos",
+            "description": "Liberar todos os recursos do Grindr (incluindo os experimentais)"
         },
         "local_saved_phrases": {
-            "name": "Local saved phrases",
-            "description": "Save unlimited phrases locally"
+            "name": "Frases salvas localmente",
+            "description": "Salvar frases localmente sem limite"
         },
         "location_spoofer": {
-            "name": "Location spoofer",
-            "description": "Spoof your location"
+            "name": "Simulador de localização",
+            "description": "Simular sua localização"
         },
         "mod_settings": {
-            "name": "Mod settings",
-            "description": "GrindrPlus settings"
+            "name": "Configurações do mod",
+            "description": "Configurações do GrindrPlus"
         },
         "online_indicator": {
-            "name": "Online indicator",
-            "description": "More accurate online status indicator"
+            "name": "Indicador de status online",
+            "description": "Indicador de status online mais preciso"
         },
         "profile_details": {
-            "name": "Profile details",
-            "description": "Add extra fields and details to profiles",
-            "profile_id": "Profile ID",
-            "approximate_distance": "Approximate distance",
-            "found_via_teleport": "Found via teleport",
-            "favorite": "Favorite",
-            "from_viewed_me": "From viewed me",
-            "innaccessible_profile": "Inaccessible profile",
-            "jwt_boosting": "JWT boosting",
-            "new": "New",
-            "teleporting": "Teleporting",
-            "online_now": "Online now",
-            "hidden_profile_details": "Hidden profile details",
+            "name": "Detalhes do perfil",
+            "description": "Adicionar campos e informações extras aos perfis",
+            "profile_id": "ID do perfil",
+            "approximate_distance": "Distância aproximada",
+            "found_via_teleport": "Encontrado por teletransporte",
+            "favorite": "Favorito",
+            "from_viewed_me": "Da lista \"Me visualizaram\"",
+            "innaccessible_profile": "Perfil inacessível",
+            "jwt_boosting": "Impulsionamento por JWT",
+            "new": "Novo",
+            "teleporting": "Teletransportando",
+            "online_now": "Online agora",
+            "hidden_profile_details": "Detalhes do perfil ocultos",
             "ok": "OK",
-            "underweight": "Underweight",
-            "normal_weight": "Normal weight",
-            "overweight": "Overweight",
-            "obese": "Obese"
+            "underweight": "Abaixo do peso",
+            "normal_weight": "Peso normal",
+            "overweight": "Acima do peso",
+            "obese": "Obesidade"
         },
         "profile_views": {
-            "name": "Profile views",
-            "description": "Control whether others can see you've viewed their profile"
+            "name": "Visualizações de perfil",
+            "description": "Controlar se outras pessoas podem ver que você visitou o perfil delas"
         },
         "removable_messages": {
-            "name": "Removable messages",
-            "description": "Remove messages for both parties"
+            "name": "Mensagens removíveis",
+            "description": "Remover mensagens para ambas as pessoas"
         },
         "signature_spoofer": {
-            "title": "Signature spoofer",
-            "description": "Allow logging in with Google while using LSPatch"
+            "title": "Simulador de assinatura",
+            "description": "Permitir entrar com o Google ao usar o LSPatch"
         },
         "unlimited_albums": {
-            "name": "Unlimited albums",
-            "description": "Ability to view unlimited albums"
+            "name": "Álbuns ilimitados",
+            "description": "Possibilidade de visualizar álbuns sem limite"
         },
         "unlimited_profiles": {
-            "name": "Unlimited profiles",
-            "description": "View unlimited profiles in cascade"
+            "name": "Perfis ilimitados",
+            "description": "Visualizar perfis sem limite na grade"
         }
     },
     "commands": {
         "location": {
-            "teleport_to_location": "Teleport to a locatioN",
-            "teleportation_disabled": "Teleportation disabled",
-            "teleported_to_coords": "Teleported to {lat}, {lon}",
-            "location_not_found": "Location not found",
-            "save_current_location": "Save the current location",
-            "provide_name_for_location": "Please provide a name for the location",
-            "successfully_updated_location": "Successfully updated {name}!",
-            "successfully_saved_location": "Successfully saved {name}!",
-            "delete_saved_location": "Delete a saved location",
-            "successfully_deleted_location": "Successfully deleted {name}!"
+            "teleport_to_location": "Teletransportar para um local",
+            "teleportation_disabled": "Teletransporte desativado",
+            "teleported_to_coords": "Teletransportado para {lat}, {lon}",
+            "location_not_found": "Local não encontrado",
+            "save_current_location": "Salvar localização atual",
+            "provide_name_for_location": "Informe um nome para a localização",
+            "successfully_updated_location": "{name} atualizado com sucesso!",
+            "successfully_saved_location": "{name} salvo com sucesso!",
+            "delete_saved_location": "Excluir uma localização salva",
+            "successfully_deleted_location": "{name} excluído com sucesso!"
         },
         "profile": {
-            "open_user_profile": "Open a user profile",
-            "provide_user_id": "Please provide a valid ID",
-            "get_and_copy_id": "Get and copy profile IDs",
-            "your_id": "Your ID",
-            "profile_id": "Profile ID",
-            "profile_ids": "Profile IDs",
-            "copy_my_id": "Copy my ID",
-            "copy_profile_id": "Copy profile ID",
-            "close": "Close"
+            "open_user_profile": "Abrir perfil de usuário",
+            "provide_user_id": "Informe um ID válido",
+            "get_and_copy_id": "Obter e copiar IDs de perfil",
+            "your_id": "Seu ID",
+            "profile_id": "ID do perfil",
+            "profile_ids": "IDs de perfil",
+            "copy_my_id": "Copiar meu ID",
+            "copy_profile_id": "Copiar ID do perfil",
+            "close": "Fechar"
         }
     },
     "settings": {
-        "export_config": "Export config",
-        "import_config": "Import config",
-        "export_database": "Export database",
-        "import_database": "Import database",
-        "reset_grindrplus": "Reset GrindrPlus",
-        "reload_hooks": "Reload hooks",
+        "export_config": "Exportar configuração",
+        "import_config": "Importar configuração",
+        "export_database": "Exportar banco de dados",
+        "import_database": "Importar banco de dados",
+        "reset_grindrplus": "Redefinir GrindrPlus",
+        "reload_hooks": "Recarregar gatilhos",
         "manage_hooks": "Gerenciar gatilhos",
-        "database_imported_successfully": "Database imported successfully",
-        "database_exported_successfully": "Database exported successfully",
-        "failed_to_export_database": "Failed to export database!",
-        "failed_to_restore_database": "Failed to restore database!",
-        "failed_to_import_database": "Failed to import database!",
-        "config_imported_successfully": "Config imported successfully",
-        "config_exported_successfully": "Config exported successfully",
-        "failed_to_restore_config": "Failed to restore config!",
-        "failed_to_import_config": "Failed to import config!",
-        "failed_to_export_config": "Failed to export config!",
-        "database_import": "Database import",
-        "database_import_description": "The database has been successfully imported. The app will now close to apply the changes.",
+        "database_imported_successfully": "Banco de dados importado com sucesso",
+        "database_exported_successfully": "Banco de dados exportado com sucesso",
+        "failed_to_export_database": "Falha ao exportar o banco de dados!",
+        "failed_to_restore_database": "Falha ao restaurar o banco de dados!",
+        "failed_to_import_database": "Falha ao importar o banco de dados!",
+        "config_imported_successfully": "Configuração importada com sucesso",
+        "config_exported_successfully": "Configuração exportada com sucesso",
+        "failed_to_restore_config": "Falha ao restaurar a configuração!",
+        "failed_to_import_config": "Falha ao importar a configuração!",
+        "failed_to_export_config": "Falha ao exportar a configuração!",
+        "database_import": "Importação do banco de dados",
+        "database_import_description": "O banco de dados foi importado com sucesso. O aplicativo será fechado para aplicar as alterações.",
         "ok": "OK",
-        "other_settings": "Other settings",
-        "online_indicator_title": "Online indicator duration (mins)",
-        "online_indicator_description": "Control when online green dots disappear after inactivity",
-        "favorites_grid_size": "Favorites grid size",
-        "favorites_grid_size_description": "Customize grid size of the layout for the favorites tab",
+        "other_settings": "Outras configurações",
+        "online_indicator_title": "Duração do indicador online (min)",
+        "online_indicator_description": "Definir quando os pontos verdes de status online desaparecem após um período de inatividade",
+        "favorites_grid_size": "Tamanho da grade de favoritos",
+        "favorites_grid_size_description": "Personalizar o tamanho da grade da aba de favoritos",
         "reset_grindrplus_title": "Redefinir o GrindrPlus",
-        "reset_grindrplus_description": "This will reset the database and the config of the mod, which means your cached albums/pictures will be gone, as well as saved phrases and locations.",
-        "yes": "Yes",
+        "reset_grindrplus_description": "Isso redefinirá o banco de dados e a configuração do mod. Seus álbuns e fotos em cache, assim como as frases e localizações salvas, serão perdidos.",
+        "yes": "Sim",
         "no": "Não"
     }
 }

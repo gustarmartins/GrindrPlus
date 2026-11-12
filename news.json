@@ -118,5 +118,11 @@
     "message_id": 199,
     "text": "New release v5.0.1 is out. Please download the mod from the Grindr Plus home! href=\"https://github.com/gustarmartins/GrindrPlus/releases/tag/v5.0.1-26.0.1\">the v5.0.1 release page</a>.<br><br>If you're using <b>LSPatch</b>, you can update as usual from the <b>Install</b> menu in the GrindrPlus app, no reinstallation of Grindr needed.",
     "date": 1780267561
+  },
+  {
+    "message_id": 901794519291086,
+    "text": "## New Grindr version spoof added\n\nheya, if Grindr is no longer working ensure to fetch latest from the repo or manually input 26.24.0 in version name and 195444 in version code at Settings\n\n#push",
+    "date": 1794519291,
+    "gplus_composer_id": "f6dfcdad-2e9f-42f7-bd08-6a5754dd9866"
   }
 ]
